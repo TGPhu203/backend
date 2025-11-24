@@ -1,0 +1,31 @@
+2025-11-17 17:55:13 error: Error adding stripe column:
+2025-11-17 18:29:50 error: Error adding stripe column:
+2025-11-17 18:30:07 error: Error adding stripe column:
+2025-11-17 18:30:15 error: Error adding stripe column:
+2025-11-18 01:10:51 error: Error adding stripe column:
+2025-11-18 02:32:16 error: Error connecting to MongoDB:
+2025-11-18 02:32:57 error: Error connecting to MongoDB:
+2025-11-18 02:33:14 error: Error connecting to MongoDB:
+2025-11-18 02:33:35 error: Error connecting to MongoDB:
+2025-11-18 02:36:41 error: Error connecting to MongoDB:
+2025-11-18 02:37:00 error: Error connecting to MongoDB:
+2025-11-18 02:37:22 error: Error connecting to MongoDB:
+2025-11-18 02:43:13 error: Error connecting to MongoDB:
+2025-11-18 16:21:47 error: Error connecting to MongoDB:
+2025-11-18 16:21:47 error: Error connecting to MongoDB:
+2025-11-18 16:27:58 error: ❌ Error connecting to MongoDB:
+2025-11-18 16:27:59 error: ❌ Error connecting to MongoDB:
+2025-11-19 00:36:48 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 00:36:48 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:01:27 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:01:27 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:04:46 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:07:27 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:16:43 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:16:43 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:19:34 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:23:34 error: ❌ Error connecting to MongoDB: bad auth : authentication failed
+2025-11-19 01:29:23 error: UNCAUGHT EXCEPTION! 💥 Shutting down...
+2025-11-19 02:50:06 error: UNCAUGHT EXCEPTION! 💥 Shutting down...
+2025-11-19 02:50:06 error: UNCAUGHT EXCEPTION! 💥 Shutting down...
+2025-11-19 02:50:06 error: UNCAUGHT EXCEPTION! 💥 Shutting down...

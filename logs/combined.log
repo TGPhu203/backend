@@ -1,0 +1,149 @@
+2025-11-17 17:55:13 info: Database connection has been established successfully.
+2025-11-17 17:55:13 error: Error adding stripe column:
+2025-11-17 17:55:13 info: Server running in development mode on port 8888
+2025-11-17 18:29:50 info: Database connection has been established successfully.
+2025-11-17 18:29:50 error: Error adding stripe column:
+2025-11-17 18:29:50 info: Server running in development mode on port 8888
+2025-11-17 18:30:07 info: Database connection has been established successfully.
+2025-11-17 18:30:07 error: Error adding stripe column:
+2025-11-17 18:30:07 info: Server running in development mode on port 8888
+2025-11-17 18:30:15 info: Database connection has been established successfully.
+2025-11-17 18:30:15 error: Error adding stripe column:
+2025-11-17 18:30:15 info: Server running in development mode on port 8888
+2025-11-18 01:10:51 info: Database connection has been established successfully.
+2025-11-18 01:10:51 error: Error adding stripe column:
+2025-11-18 01:10:51 info: Server running in development mode on port 8888
+2025-11-18 02:32:16 error: Error connecting to MongoDB:
+2025-11-18 02:32:57 error: Error connecting to MongoDB:
+2025-11-18 02:33:14 error: Error connecting to MongoDB:
+2025-11-18 02:33:35 error: Error connecting to MongoDB:
+2025-11-18 02:36:41 error: Error connecting to MongoDB:
+2025-11-18 02:37:00 error: Error connecting to MongoDB:
+2025-11-18 02:37:22 error: Error connecting to MongoDB:
+2025-11-18 02:43:13 error: Error connecting to MongoDB:
+2025-11-18 16:21:47 error: Error connecting to MongoDB:
+2025-11-18 16:21:47 error: Error connecting to MongoDB:
+2025-11-18 16:27:58 error: ❌ Error connecting to MongoDB:
+2025-11-18 16:27:59 error: ❌ Error connecting to MongoDB:
+2025-11-19 00:36:48 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 00:36:48 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:01:27 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:01:27 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:04:46 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:07:27 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:16:43 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:16:43 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:19:34 error: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://www.mongodb.com/docs/atlas/security-whitelist/
+2025-11-19 01:23:34 error: ❌ Error connecting to MongoDB: bad auth : authentication failed
+2025-11-19 01:26:40 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-19 01:26:40 info: Database: webbanhang_dev
+2025-11-19 01:26:40 info: Server running in development mode on port 8888
+2025-11-19 01:29:23 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-19 01:30:03 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-19 01:30:03 info: Database: webbanhang_dev
+2025-11-19 01:30:03 info: Server running in development mode on port 8888
+2025-11-19 02:50:06 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-19 02:50:06 info: Database: webbanhang_dev
+2025-11-19 02:50:06 info: Server running in development mode on port 8888
+2025-11-19 02:50:06 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-19 02:50:06 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-19 02:50:06 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 14:41:32 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 14:41:32 info: Database: webbanhang_dev
+2025-11-20 14:41:32 info: Server running in development mode on port 8888
+2025-11-20 14:43:16 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 14:43:16 info: Database: webbanhang_dev
+2025-11-20 14:43:16 info: Server running in development mode on port 8888
+2025-11-20 15:33:00 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 15:33:00 info: Database: webbanhang_dev
+2025-11-20 15:33:00 info: Server running in development mode on port 8888
+2025-11-20 15:34:56 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 15:34:56 info: Database: webbanhang_dev
+2025-11-20 15:34:56 info: Server running in development mode on port 8888
+2025-11-20 16:01:25 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 16:01:25 info: Database: webbanhang_dev
+2025-11-20 16:01:25 info: Server running in development mode on port 8888
+2025-11-20 16:08:25 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 16:08:25 info: Database: webbanhang_dev
+2025-11-20 16:08:25 info: Server running in development mode on port 8888
+2025-11-20 16:09:15 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 16:09:15 info: Database: webbanhang_dev
+2025-11-20 16:09:15 info: Server running in development mode on port 8888
+2025-11-20 16:10:51 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 16:10:51 info: Database: webbanhang_dev
+2025-11-20 16:10:51 info: Server running in development mode on port 8888
+2025-11-20 16:11:52 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 16:11:52 info: Database: webbanhang_dev
+2025-11-20 16:11:53 info: Server running in development mode on port 8888
+2025-11-20 16:15:25 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 16:15:25 info: Database: webbanhang_dev
+2025-11-20 16:15:25 info: Server running in development mode on port 8888
+2025-11-20 16:18:17 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 16:18:17 info: Database: webbanhang_dev
+2025-11-20 16:18:17 info: Server running in development mode on port 8888
+2025-11-20 16:23:10 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 16:23:10 info: Database: webbanhang_dev
+2025-11-20 16:23:10 info: Server running in development mode on port 8888
+2025-11-20 16:40:46 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 16:40:46 info: Database: webbanhang_dev
+2025-11-20 16:40:46 info: Server running in development mode on port 8888
+2025-11-20 16:47:04 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 16:47:04 info: Database: webbanhang_dev
+2025-11-20 16:47:04 info: Server running in development mode on port 8888
+2025-11-20 16:47:14 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-20 16:47:14 info: Database: webbanhang_dev
+2025-11-20 16:47:14 info: Server running in development mode on port 8888
+2025-11-22 23:45:20 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-22 23:45:20 info: Database: webbanhang_dev
+2025-11-22 23:45:20 info: Server running in development mode on port 8888
+2025-11-23 00:00:09 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-23 00:00:09 info: Database: webbanhang_dev
+2025-11-23 00:00:09 info: Server running in development mode on port 8888
+2025-11-23 00:12:07 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-23 00:12:07 info: Database: webbanhang_dev
+2025-11-23 00:12:07 info: Server running in development mode on port 8888
+2025-11-23 00:22:25 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-23 00:22:25 info: Database: webbanhang_dev
+2025-11-23 00:22:25 info: Server running in development mode on port 8888
+2025-11-23 02:10:52 info: MongoDB Connected: ac-olplqb2-shard-00-00.2blsffj.mongodb.net
+2025-11-23 02:10:52 info: Database: webbanhang_dev
+2025-11-23 02:10:52 info: Server running in development mode on port 8888
+2025-11-24 01:18:47 info: MongoDB Connected: localhost
+2025-11-24 01:18:47 info: Database: test
+2025-11-24 01:18:47 info: Server running in development mode on port 8888
+2025-11-24 01:28:33 info: MongoDB Connected: localhost
+2025-11-24 01:28:33 info: Database: webbanhang_dev
+2025-11-24 01:28:33 info: Server running in development mode on port 8888
+2025-11-24 01:29:01 info: MongoDB Connected: localhost
+2025-11-24 01:29:01 info: Database: webbanhang_dev
+2025-11-24 01:29:01 info: Server running in development mode on port 8888
+2025-11-24 02:04:05 info: MongoDB Connected: localhost
+2025-11-24 02:04:05 info: Database: webbanhang_dev
+2025-11-24 02:04:05 info: Server running in development mode on port 8888
+2025-11-24 02:08:31 info: MongoDB Connected: localhost
+2025-11-24 02:08:31 info: Database: webbanhang_dev
+2025-11-24 02:08:31 info: Server running in development mode on port 8888
+2025-11-24 02:10:06 info: MongoDB Connected: localhost
+2025-11-24 02:10:06 info: Database: webbanhang_dev
+2025-11-24 02:10:06 info: Server running in development mode on port 8888
+2025-11-24 02:54:45 info: MongoDB Connected: localhost
+2025-11-24 02:54:45 info: Database: webbanhang_dev
+2025-11-24 02:54:45 info: Server running in development mode on port 8888
+2025-11-24 02:58:31 info: MongoDB Connected: localhost
+2025-11-24 02:58:31 info: Database: webbanhang_dev
+2025-11-24 02:58:31 info: Server running in development mode on port 8888
+2025-11-24 03:00:31 info: MongoDB Connected: localhost
+2025-11-24 03:00:31 info: Database: webbanhang_dev
+2025-11-24 03:00:31 info: Server running in development mode on port 8888
+2025-11-24 03:03:19 info: MongoDB Connected: localhost
+2025-11-24 03:03:19 info: Database: webbanhang_dev
+2025-11-24 03:03:19 info: Server running in development mode on port 8888
+2025-11-24 03:05:02 info: MongoDB Connected: localhost
+2025-11-24 03:05:02 info: Database: webbanhang_dev
+2025-11-24 03:05:02 info: Server running in development mode on port 8888
+2025-11-24 10:26:30 info: MongoDB Connected: localhost
+2025-11-24 10:26:30 info: Database: webbanhang_dev
+2025-11-24 10:26:30 info: Server running in development mode on port 8888
+2025-11-24 10:41:37 info: MongoDB Connected: localhost
+2025-11-24 10:41:37 info: Database: webbanhang_dev
+2025-11-24 10:41:37 info: Server running in development mode on port 8888
