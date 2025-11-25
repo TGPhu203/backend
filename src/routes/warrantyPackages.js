@@ -1,3 +1,4 @@
+// src/routes/warrantyPackages.js
 import express from 'express';
 import {
   getAllWarrantyPackages,
@@ -6,8 +7,8 @@ import {
   deleteWarrantyPackage,
   getWarrantyPackageById,
   getWarrantyPackagesByProduct,
+  getWarrantyByImei, 
 } from '../controllers/warrantyPackageController.js';
-import { authenticate } from '../middlewares/authenticate.js';
 import { adminAuthenticate } from '../middlewares/adminAuth.js';
 
 const router = express.Router();
@@ -16,6 +17,7 @@ const router = express.Router();
 router.get('/', getAllWarrantyPackages);
 router.get('/product/:productId', getWarrantyPackagesByProduct);
 router.get('/:id', getWarrantyPackageById);
+router.get('/imei/:imei', getWarrantyByImei);
 
 // Admin routes
 router.post('/', adminAuthenticate, createWarrantyPackage);

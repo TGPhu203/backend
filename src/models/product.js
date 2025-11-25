@@ -1,3 +1,4 @@
+// src/models/product.js
 import mongoose from 'mongoose';
 import slugify from 'slugify';
 import keywordGeneratorService from '../services/keywordGenerator.service.js';
@@ -107,18 +108,7 @@ const productSchema = new mongoose.Schema(
       },
     ],
 
-    warrantyPackages: [
-      {
-        warrantyPackageId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'WarrantyPackage',
-        },
-        isDefault: {
-          type: Boolean,
-          default: false,
-        },
-      },
-    ],
+    // KHÔNG còn mảng warrantyPackages ở đây
   },
 
   {
@@ -187,7 +177,8 @@ productSchema.virtual('defaultVariant', {
 productSchema.pre('validate', function (next) {
   if (this.name && (!this.slug || this.isModified('name'))) {
     const random = Math.random().toString(36).substring(2, 8);
-    this.slug = slugify(this.name, { lower: true, strict: true }) + '-' + random;
+    this.slug =
+      slugify(this.name, { lower: true, strict: true }) + '-' + random;
   }
   next();
 });
@@ -204,9 +195,9 @@ productSchema.pre('save', function (next) {
       name: this.name,
       shortDescription: this.shortDescription,
       description: this.description,
-
-      // FIX: dùng categories thay vì category không tồn tại
-      category: Array.isArray(this.categories) ? this.categories.join(' ') : ''
+      category: Array.isArray(this.categories)
+        ? this.categories.join(' ')
+        : '',
     });
   }
   next();

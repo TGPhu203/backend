@@ -10,6 +10,7 @@ import {
   getPaymentMethods,
   createSetupIntent,
   createRefund,
+  createPayOSPaymentLink,  
 } from '../controllers/payment.controller.js';
 
 import { authenticate } from '../middlewares/authenticate.js';
@@ -34,5 +35,8 @@ router.post('/create-setup-intent', createSetupIntent);
 
 // Admin routes
 router.post('/refund', authorize('admin'), createRefund);
-
+// PayOS
+router.post("/payos/create-link",authenticate, createPayOSPaymentLink);
+// Webhook PayOS (KHÔNG cần verifyToken, PayOS sẽ gọi thẳng)
+router.post("/payos/webhook", handleWebhook);
 export default router;

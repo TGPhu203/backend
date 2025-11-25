@@ -34,6 +34,8 @@ router.get('/verify-email/:token', authController.verifyEmail);
 
 // Verify email via token (POST)
 router.post('/verify-email', validateRequest(verifyEmailSchema), authController.verifyEmailWithToken);
+console.log("emailSchema =", emailSchema);
+console.log("resendVerification =", authController.resendVerification);
 
 // Resend verification email
 router.post('/resend-verification', validateRequest(emailSchema), authController.resendVerification);

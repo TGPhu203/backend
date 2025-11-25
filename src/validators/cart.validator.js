@@ -1,42 +1,27 @@
 import Joi from 'joi';
 
+// helper ObjectId schema
+const objectId = Joi.string()
+  .pattern(/^[0-9a-fA-F]{24}$/)
+  .message("ID không hợp lệ");
+
 // Add to cart validation schema
 export const addToCartSchema = Joi.object({
-  productId: Joi.string().uuid().required().messages({
-    'string.guid': 'ID sản phẩm không hợp lệ',
-    'any.required': 'ID sản phẩm là trường bắt buộc',
-  }),
-  variantId: Joi.string().uuid().allow(null).optional(),
-  quantity: Joi.number().integer().min(1).default(1).messages({
-    'number.base': 'Số lượng phải là số',
-    'number.integer': 'Số lượng phải là số nguyên',
-    'number.min': 'Số lượng phải lớn hơn 0',
-  }),
+  productId: objectId.required(),
+  variantId: objectId.allow(null).optional(),
+  quantity: Joi.number().integer().min(1).default(1),
 });
 
 // Update cart item validation schema
 export const updateCartItemSchema = Joi.object({
-  quantity: Joi.number().integer().min(1).required().messages({
-    'number.base': 'Số lượng phải là số',
-    'number.integer': 'Số lượng phải là số nguyên',
-    'number.min': 'Số lượng phải lớn hơn 0',
-    'any.required': 'Số lượng là trường bắt buộc',
-  }),
+  quantity: Joi.number().integer().min(1).required(),
 });
 
 // Cart item schema for sync
 const cartItemSchema = Joi.object({
-  productId: Joi.string().uuid().required().messages({
-    'string.guid': 'ID sản phẩm không hợp lệ',
-    'any.required': 'ID sản phẩm là trường bắt buộc',
-  }),
-  variantId: Joi.string().uuid().allow(null).optional(),
-  quantity: Joi.number().integer().min(1).required().messages({
-    'number.base': 'Số lượng phải là số',
-    'number.integer': 'Số lượng phải là số nguyên',
-    'number.min': 'Số lượng phải lớn hơn 0',
-    'any.required': 'Số lượng là trường bắt buộc',
-  }),
+  productId: objectId.required(),
+  variantId: objectId.allow(null).optional(),
+  quantity: Joi.number().integer().min(1).required(),
   name: Joi.string().optional(),
   price: Joi.number().optional(),
   image: Joi.string().optional(),
@@ -45,8 +30,5 @@ const cartItemSchema = Joi.object({
 
 // Sync cart validation schema
 export const syncCartSchema = Joi.object({
-  items: Joi.array().items(cartItemSchema).required().messages({
-    'array.base': 'Danh sách sản phẩm phải là mảng',
-    'any.required': 'Danh sách sản phẩm là trường bắt buộc',
-  }),
+  items: Joi.array().items(cartItemSchema).required(),
 });

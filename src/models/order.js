@@ -70,6 +70,9 @@ const orderSchema = new mongoose.Schema(
       postalCode: { type: String, required: true },
       country: { type: String, default: 'Vietnam' },
     },
+    paymentProvider: { type: String, enum: ["stripe", "payos", "cod"], default: "cod" },
+    paymentOrderCode: { type: Number },
+    paymentLinkId: { type: String },
     billingAddress: {
       fullName: { type: String },
       phone: { type: String },

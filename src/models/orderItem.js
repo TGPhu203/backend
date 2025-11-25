@@ -1,52 +1,95 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 const orderItemSchema = new mongoose.Schema(
   {
     orderId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Order',
-      required: [true, 'Order ID is required'],
+      ref: "Order",
+      required: [true, "Order ID is required"],
       index: true,
     },
+
     productId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: [true, 'Product ID is required'],
+      ref: "Product",
+      required: [true, "Product ID is required"],
       index: true,
     },
+
     variantId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'ProductVariant',
+      ref: "ProductVariant",
       index: true,
+      default: null,
     },
-    productName: {
+
+    name: {
       type: String,
-      required: [true, 'Product name is required'],
+      required: [true, "Product name is required"],
     },
+
+    image: {
+      type: String,
+      default: null,
+    },
+
     variantName: {
       type: String,
+      default: null,
     },
+
     sku: {
       type: String,
     },
+
     quantity: {
       type: Number,
-      required: [true, 'Quantity is required'],
-      min: [1, 'Quantity must be at least 1'],
+      required: [true, "Quantity is required"],
+      min: [1, "Quantity must be at least 1"],
     },
+
     price: {
       type: Number,
-      required: [true, 'Price is required'],
-      min: [0, 'Price cannot be negative'],
+      required: [true, "Price is required"],
+      min: [0, "Price cannot be negative"],
     },
+
     totalPrice: {
       type: Number,
-      required: [true, 'Total price is required'],
-      min: [0, 'Total price cannot be negative'],
+      default: 0,
     },
-    productImage: {
+
+    // ========= IMEI CHO TỪNG MÁY =========
+    imei: {
       type: String,
+      trim: true,
+      unique: true,  // mỗi imei chỉ gắn với 1 máy
+      sparse: true,
+      index: true,
     },
+
+    // ========= BẢO HÀNH THEO MÁY =========
+    warrantyPackageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WarrantyPackage",
+      default: null,
+      index: true,
+    },
+
+    warrantyStartAt: {
+      type: Date,
+    },
+
+    warrantyEndAt: {
+      type: Date,
+    },
+
+    warrantyStatus: {
+      type: String,
+      enum: ["active", "expired", "void"],
+      default: "void",   // ❗ hợp lý hơn cho item không có gói BH
+    },
+    // =====================================
   },
   {
     timestamps: true,
@@ -58,29 +101,38 @@ const orderItemSchema = new mongoose.Schema(
 // Indexes
 orderItemSchema.index({ orderId: 1 });
 orderItemSchema.index({ productId: 1 });
+orderItemSchema.index({ warrantyPackageId: 1 });
+orderItemSchema.index({ warrantyStatus: 1 });
+orderItemSchema.index({ imei: 1 }, { unique: true, sparse: true });
 
-// Virtual for product
-orderItemSchema.virtual('product', {
-  ref: 'Product',
-  localField: 'productId',
-  foreignField: '_id',
+// Virtuals
+orderItemSchema.virtual("product", {
+  ref: "Product",
+  localField: "productId",
+  foreignField: "_id",
   justOne: true,
 });
 
-// Virtual for variant
-orderItemSchema.virtual('variant', {
-  ref: 'ProductVariant',
-  localField: 'variantId',
-  foreignField: '_id',
+orderItemSchema.virtual("variant", {
+  ref: "ProductVariant",
+  localField: "variantId",
+  foreignField: "_id",
   justOne: true,
 });
 
-// Calculate total price before save
-orderItemSchema.pre('save', function (next) {
+orderItemSchema.virtual("warrantyPackage", {
+  ref: "WarrantyPackage",
+  localField: "warrantyPackageId",
+  foreignField: "_id",
+  justOne: true,
+});
+
+// Tính totalPrice
+orderItemSchema.pre("save", function (next) {
   this.totalPrice = this.price * this.quantity;
   next();
 });
 
-const OrderItem = mongoose.model('OrderItem', orderItemSchema);
+const OrderItem = mongoose.model("OrderItem", orderItemSchema);
 
 export default OrderItem;

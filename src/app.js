@@ -18,6 +18,25 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// CORS
+app.use(
+  cors({
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+      'http://localhost:8080',
+    ],
+    credentials: true,                 // << QUAN TRỌNG
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  })
+);
+
 // Security HTTP headers
 app.use(
   helmet({
@@ -26,26 +45,7 @@ app.use(
   })
 );
 
-// CORS
-app.use(
-  cors({
-    origin:
-      process.env.NODE_ENV === 'production'
-        ? process.env.FRONTEND_URL || 'https://yourdomain.com'
-        : [
-          'http://localhost:3000',
-          'http://localhost:5173',
-          'http://localhost:5174',
-          'http://localhost:5175',
-          'http://localhost:8080',
-
-        ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-    exposedHeaders: ['Set-Cookie'],
-  })
-);
+// BẮT BUỘC phải để preflight dùng CORS đúng config
 app.options('*', cors());
 
 // Logging

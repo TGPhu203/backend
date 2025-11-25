@@ -31,9 +31,10 @@ const cartItemSchema = new mongoose.Schema(
     },
     totalPrice: {
       type: Number,
-      required: [true, 'Total price is required'],
+      default: 0,
       min: [0, 'Total price cannot be negative'],
     },
+    
     addedAt: {
       type: Date,
       default: Date.now,

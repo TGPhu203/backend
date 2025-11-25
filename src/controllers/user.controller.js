@@ -1,5 +1,25 @@
+// controllers/user.controller.js
 import { User, Address } from '../models/index.js';
 import { AppError } from '../middlewares/errorHandler.js';
+
+// Lấy thông tin profile user hiện tại
+export const getProfile = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      throw new AppError('Không tìm thấy người dùng', 404);
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: user.toJSON(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // Update user profile
 export const updateProfile = async (req, res, next) => {
@@ -36,19 +56,16 @@ export const changePassword = async (req, res, next) => {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;
 
-    // Find user
     const user = await User.findById(userId);
     if (!user) {
       throw new AppError('Không tìm thấy người dùng', 404);
     }
 
-    // Check current password
     const isMatch = await user.comparePassword(currentPassword);
     if (!isMatch) {
       throw new AppError('Mật khẩu hiện tại không đúng', 401);
     }
 
-    // Update password
     user.password = newPassword;
     await user.save();
 
@@ -66,9 +83,10 @@ export const getAddresses = async (req, res, next) => {
   try {
     const userId = req.user.id;
 
-    // Find addresses
-    const addresses = await Address.find({ userId })
-      .sort({ isDefault: -1, createdAt: -1 });
+    const addresses = await Address.find({ userId }).sort({
+      isDefault: -1,
+      createdAt: -1,
+    });
 
     res.status(200).json({
       status: 'success',
@@ -85,13 +103,11 @@ export const addAddress = async (req, res, next) => {
     const userId = req.user.id;
     const addressData = req.body;
 
-    // Check if this is the first address
     const addressCount = await Address.countDocuments({ userId });
     if (addressCount === 0) {
       addressData.isDefault = true;
     }
 
-    // If setting as default, update other addresses
     if (addressData.isDefault) {
       await Address.updateMany(
         { userId, isDefault: true },
@@ -99,7 +115,6 @@ export const addAddress = async (req, res, next) => {
       );
     }
 
-    // Create address
     const address = new Address({
       ...addressData,
       userId,
@@ -123,14 +138,12 @@ export const updateAddress = async (req, res, next) => {
     const userId = req.user.id;
     const addressData = req.body;
 
-    // Find address
     const address = await Address.findOne({ _id: id, userId });
 
     if (!address) {
       throw new AppError('Không tìm thấy địa chỉ', 404);
     }
 
-    // If setting as default, update other addresses
     if (addressData.isDefault && !address.isDefault) {
       await Address.updateMany(
         { userId, isDefault: true },
@@ -138,7 +151,6 @@ export const updateAddress = async (req, res, next) => {
       );
     }
 
-    // Update address
     Object.assign(address, addressData);
     await address.save();
 
@@ -157,20 +169,18 @@ export const deleteAddress = async (req, res, next) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    // Find address
     const address = await Address.findOne({ _id: id, userId });
 
     if (!address) {
       throw new AppError('Không tìm thấy địa chỉ', 404);
     }
 
-    // Delete address
     await address.deleteOne();
 
-    // If deleted address was default, set another address as default
     if (address.isDefault) {
-      const anotherAddress = await Address.findOne({ userId })
-        .sort({ createdAt: -1 });
+      const anotherAddress = await Address.findOne({ userId }).sort({
+        createdAt: -1,
+      });
 
       if (anotherAddress) {
         anotherAddress.isDefault = true;
@@ -193,20 +203,17 @@ export const setDefaultAddress = async (req, res, next) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    // Find address
     const address = await Address.findOne({ _id: id, userId });
 
     if (!address) {
       throw new AppError('Không tìm thấy địa chỉ', 404);
     }
 
-    // Update other addresses
     await Address.updateMany(
       { userId, isDefault: true },
       { isDefault: false }
     );
 
-    // Set as default
     address.isDefault = true;
     await address.save();
 
@@ -217,14 +224,4 @@ export const setDefaultAddress = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-};
-
-export {
-  updateProfile,
-  changePassword,
-  getAddresses,
-  addAddress,
-  updateAddress,
-  deleteAddress,
-  setDefaultAddress,
 };

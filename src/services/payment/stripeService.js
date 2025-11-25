@@ -1,3 +1,5 @@
+console.log("👉 BACKEND STRIPE KEY:", process.env.STRIPE_SECRET_KEY);
+
 import Stripe from 'stripe';
 import { AppError } from '../../middlewares/errorHandler.js';
 

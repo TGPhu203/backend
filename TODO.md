@@ -35,7 +35,7 @@
 
 ## Phase 4: Update Controllers (13 controllers)
 - [x] product.controller.js
-- [x] auth.controller.js
+- [x] 
 - [x] cart.controller.js
 - [x] order.controller.js
 - [x] user.controller.js

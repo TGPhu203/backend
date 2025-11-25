@@ -1,8 +1,8 @@
 // routes/order.routes.js
-import express from 'express';
+import express from "express";
 const router = express.Router();
 
-// Sử dụng named imports thay vì default import
+// Controllers
 import {
   createOrder,
   getUserOrders,
@@ -12,27 +12,62 @@ import {
   repayOrder,
   getAllOrders,
   updateOrderStatus,
-} from '../controllers/order.controller.js';
+} from "../controllers/order.controller.js";
 
-import { validateRequest } from '../middlewares/validateRequest.js';
+// Middlewares
+import { authenticate } from "../middlewares/authenticate.js";
+import { authorize } from "../middlewares/authorize.js";
+
+import {
+  validateRequest,
+  validateOrderAddress, // 🔥 Cái này dùng cho createOrder
+} from "../middlewares/validateRequest.js";
+
 import {
   createOrderSchema,
   updateOrderStatusSchema,
-} from '../validators/order.validator.js';
-import { authenticate } from '../middlewares/authenticate.js';
-import { authorize } from '../middlewares/authorize.js';
+} from "../validators/order.validator.js";
 
-// User routes (authenticated)
+// 🔒 User must be authenticated
 router.use(authenticate);
-router.post('/', validateRequest(createOrderSchema), createOrder);
-router.get('/', getUserOrders);
-router.get('/number/:number', getOrderByNumber);
-router.get('/:id', getOrderById);
-router.post('/:id/cancel', cancelOrder);
-router.post('/:id/repay', repayOrder);
 
-// Admin routes
-router.get('/admin/all', authorize('admin'), getAllOrders);
-router.patch('/admin/:id/status', authorize('admin'), validateRequest(updateOrderStatusSchema), updateOrderStatus);
+// ================================
+// USER ROUTES
+// ================================
+
+// 🟢 Tạo đơn hàng
+// ❗ Bỏ validateRequest(createOrderSchema)
+// ❗ Dùng validateOrderAddress (khớp BE)
+router.post("/", validateOrderAddress, createOrder);
+
+// 🟢 Lấy danh sách đơn hàng
+router.get("/", getUserOrders);
+
+// 🟢 Lấy đơn theo số đơn
+router.get("/number/:number", getOrderByNumber);
+
+// 🟢 Lấy đơn theo ID
+router.get("/:id", getOrderById);
+
+// 🟢 Hủy đơn
+router.post("/:id/cancel", cancelOrder);
+
+// 🟢 Thanh toán lại
+router.post("/:id/repay", repayOrder);
+
+// ================================
+// ADMIN ROUTES
+// ================================
+
+// 🟣 Admin xem tất cả đơn
+router.get("/admin/all", authorize("admin"), getAllOrders);
+
+// 🟣 Admin cập nhật trạng thái đơn
+router.patch(
+  "/admin/:id/status",
+  authorize("admin"),
+  validateRequest(updateOrderStatusSchema),
+  updateOrderStatus
+);
 
 export default router;

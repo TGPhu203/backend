@@ -18,6 +18,7 @@ import ProductWarranty from './productWarranty.js';
 import AttributeGroup from './attributeGroup.js';
 import AttributeValue from './attributeValue.js';
 import ProductAttributeGroup from './productAttributeGroup.js';
+import RepairRequest from './repairRequest.js';
 import Image from './image.js';
 
 /* ------------------- EXPORT ------------------- */
@@ -43,4 +44,5 @@ export {
   AttributeValue,
   ProductAttributeGroup,
   Image,
+  RepairRequest,
 };

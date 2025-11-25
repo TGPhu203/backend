@@ -5,26 +5,22 @@ import { User } from "../models/index.js";
 import { AppError } from "../middlewares/errorHandler.js";
 import * as emailService from "../services/email/emailService.js";
 
-/**
- * Helper: sign token (throws if secret missing)
- */
+/** Helper: sign token */
 function signToken(payload, secret, expiresIn) {
-  if (!secret) throw new Error("Missing JWT secret in environment variables");
+  if (!secret) throw new Error("Missing JWT secret");
   return jwt.sign(payload, secret, { expiresIn });
 }
 
-// ================= REGISTER =================
+/* ================= REGISTER ================= */
 export const register = async (req, res, next) => {
   try {
     const { email, password, firstName, lastName, phone } = req.body;
-    if (!email || !password || !firstName || !lastName) {
-      throw new AppError("Thiếu thông tin bắt buộc", 400);
-    }
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      throw new AppError("Email đã được sử dụng", 400);
-    }
+    if (!email || !password || !firstName || !lastName)
+      throw new AppError("Thiếu thông tin bắt buộc", 400);
+
+    const exists = await User.findOne({ email });
+    if (exists) throw new AppError("Email đã được sử dụng", 400);
 
     const verificationToken = crypto.randomBytes(32).toString("hex");
 
@@ -39,73 +35,66 @@ export const register = async (req, res, next) => {
 
     await user.save();
 
-    // send verification email (don't block response if email fails)
     try {
       await emailService.sendVerificationEmail(user.email, verificationToken);
-    } catch (err) {
-      // log but don't fail registration just because email failed
-      // console.error("Failed to send verification email:", err);
-    }
+    } catch { }
 
     res.status(201).json({
       status: "success",
       data: {
-        message:
-          "Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.",
+        message: "Đăng ký thành công. Vui lòng kiểm tra email để xác thực.",
       },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
-// ================= LOGIN =================
+/* ================= LOGIN ================= */
 export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      throw new AppError("Email và mật khẩu là bắt buộc", 400);
-    }
 
-    // select password explicitly because schema has select:false
+    if (!email || !password)
+      throw new AppError("Email và mật khẩu là bắt buộc", 400);
+
     const user = await User.findOne({ email }).select("+password");
     if (!user) throw new AppError("Email hoặc mật khẩu không đúng", 401);
+    if (!user.isActive) throw new AppError("Tài khoản bị khóa", 401);
 
-    /*
-      Nếu bạn muốn bắt buộc verify email, bỏ comment đoạn này:
-    if (!user.isEmailVerified)
-      throw new AppError('Vui lòng xác thực email trước khi đăng nhập', 401);
-    */
+    const match = await user.comparePassword(password);
+    if (!match) throw new AppError("Email hoặc mật khẩu không đúng", 401);
 
-    if (!user.isActive)
-      throw new AppError(
-        "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên",
-        401
-      );
+    const token = signToken(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      "1d"
+    );
 
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) throw new AppError("Email hoặc mật khẩu không đúng", 401);
+    const refreshToken = signToken(
+      { id: user._id },
+      process.env.JWT_REFRESH_SECRET,
+      "7d"
+    );
 
-    // Tạo token (bảo đảm tồn tại secret)
-    let token;
-    let refreshToken;
-    try {
-      token = signToken(
-        { id: user._id, role: user.role },
-        process.env.JWT_SECRET,
-        process.env.JWT_EXPIRES_IN || "1h"
-      );
+    /* Cookie cross-site */
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",      
+      path: "/",
+      maxAge: 24 * 3600 * 1000,
+    });
 
-      refreshToken = signToken(
-        { id: user._id },
-        process.env.JWT_REFRESH_SECRET,
-        process.env.JWT_REFRESH_EXPIRES_IN || "7d"
-      );
-    } catch (err) {
-      return next(new AppError("Server cấu hình token chưa đúng", 500));
-    }
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      
+      path: "/",
+      maxAge: 7 * 24 * 3600 * 1000,
+    });
 
-    // trả user không kèm password (model toJSON đã loại password)
     res.status(200).json({
       status: "success",
       data: {
@@ -114,34 +103,40 @@ export const login = async (req, res, next) => {
           email: user.email,
           fullName: `${user.firstName} ${user.lastName}`,
           role: user.role,
-          isEmailVerified: user.isEmailVerified,
           isActive: user.isActive,
+          isEmailVerified: user.isEmailVerified,
         },
         token,
-        refreshToken,
-      }
-
+        refreshToken
+      },
     });
-  } catch (error) {
-    next(error);
+    
+  } catch (err) {
+    next(err);
   }
 };
 
-// ================= LOGOUT =================
+
+/* ================= LOGOUT ================= */
 export const logout = async (req, res, next) => {
   try {
-    // Nếu dùng cookie: res.clearCookie('jwt')
-    res.status(204).send();
-  } catch (error) {
-    next(error);
+    res.clearCookie("token");
+    res.clearCookie("refreshToken");
+
+    res.status(200).json({
+      status: "success",
+      message: "Đăng xuất thành công",
+    });
+  } catch (err) {
+    next(err);
   }
 };
 
-// ================= VERIFY EMAIL (GET :token) =================
+/* ================= VERIFY EMAIL ================= */
 export const verifyEmail = async (req, res, next) => {
   try {
     const { token } = req.params;
-    if (!token) throw new AppError("Token xác thực bắt buộc", 400);
+    if (!token) throw new AppError("Token không hợp lệ", 400);
 
     const user = await User.findOne({ verificationToken: token });
     if (!user) throw new AppError("Token không hợp lệ hoặc đã hết hạn", 400);
@@ -152,21 +147,21 @@ export const verifyEmail = async (req, res, next) => {
 
     res.status(200).json({
       status: "success",
-      data: { message: "Xác thực email thành công. Bạn có thể đăng nhập ngay bây giờ." },
+      data: { message: "Xác thực email thành công." },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
-// ================= VERIFY EMAIL (POST body.token) =================
+/* ================= VERIFY EMAIL (POST TOKEN) ================= */
 export const verifyEmailWithToken = async (req, res, next) => {
   try {
     const { token } = req.body;
-    if (!token) throw new AppError("Token xác thực bắt buộc", 400);
+    if (!token) throw new AppError("Token không hợp lệ", 400);
 
     const user = await User.findOne({ verificationToken: token });
-    if (!user) throw new AppError("Token không hợp lệ hoặc đã hết hạn", 400);
+    if (!user) throw new AppError("Token không hợp lệ", 400);
 
     user.isEmailVerified = true;
     user.verificationToken = null;
@@ -174,14 +169,14 @@ export const verifyEmailWithToken = async (req, res, next) => {
 
     res.status(200).json({
       status: "success",
-      data: { message: "Xác thực email thành công. Bạn có thể đăng nhập ngay bây giờ." },
+      data: { message: "Xác thực email thành công." },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
-// ================= RESEND VERIFICATION =================
+/* ================= RESEND VERIFICATION EMAIL ================= */
 export const resendVerification = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -190,77 +185,69 @@ export const resendVerification = async (req, res, next) => {
     const user = await User.findOne({ email });
     if (!user) throw new AppError("Không tìm thấy tài khoản với email này", 404);
 
-    if (user.isEmailVerified) throw new AppError("Email đã được xác thực", 400);
+    if (user.isEmailVerified)
+      throw new AppError("Email đã được xác thực trước đó", 400);
 
     const verificationToken = crypto.randomBytes(32).toString("hex");
     user.verificationToken = verificationToken;
     await user.save();
 
     try {
-      await emailService.sendVerificationEmail(user.email, verificationToken);
-    } catch (err) {
-      // log but don't fail
-    }
+      await emailService.sendVerificationEmail(email, verificationToken);
+    } catch { }
 
     res.status(200).json({
       status: "success",
-      data: { message: "Đã gửi lại email xác thực. Vui lòng kiểm tra email của bạn." },
+      data: { message: "Email xác thực đã được gửi lại." },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
-// ================= REFRESH TOKEN =================
+/* ================= REFRESH TOKEN ================= */
 export const refreshToken = async (req, res, next) => {
   try {
-    const { refreshToken } = req.body;
-    if (!refreshToken) throw new AppError("Refresh token là bắt buộc", 401);
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken)
+      throw new AppError("Bạn cần đăng nhập lại", 401);
 
-    let decoded;
-    try {
-      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-    } catch (err) {
-      return next(new AppError("Refresh token không hợp lệ hoặc đã hết hạn", 401));
-    }
-
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.id);
     if (!user) throw new AppError("Refresh token không hợp lệ", 401);
 
-    if (!user.isActive)
-      throw new AppError(
-        "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên",
-        401
-      );
+    const newToken = signToken(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      "1d"
+    );
 
-    let token;
-    try {
-      token = signToken(
-        { id: user._id, role: user.role },
-        process.env.JWT_SECRET,
-        process.env.JWT_EXPIRES_IN || "1h"
-      );
-    } catch (err) {
-      return next(new AppError("Server cấu hình token chưa đúng", 500));
-    }
+    res.cookie("token", newToken, { 
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      
+      path: "/",
+      maxAge: 24 * 3600 * 1000,
+    });
 
     res.status(200).json({
       status: "success",
-      data: { token },
+      data: { token: newToken },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
-// ================= FORGOT PASSWORD =================
+/* ================= FORGOT PASSWORD ================= */
 export const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
     if (!email) throw new AppError("Email là bắt buộc", 400);
 
     const user = await User.findOne({ email });
-    if (!user) throw new AppError("Không tìm thấy tài khoản với email này", 404);
+    if (!user) throw new AppError("Không tìm thấy tài khoản", 404);
 
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetTokenExpires = Date.now() + 3600000;
@@ -270,32 +257,30 @@ export const forgotPassword = async (req, res, next) => {
     await user.save();
 
     try {
-      await emailService.sendResetPasswordEmail(user.email, resetToken);
-    } catch (err) {
-      // log but continue
-    }
+      await emailService.sendResetPasswordEmail(email, resetToken);
+    } catch { }
 
     res.status(200).json({
       status: "success",
-      data: { message: "Đã gửi email đặt lại mật khẩu. Vui lòng kiểm tra email." },
+      data: { message: "Đã gửi email đặt lại mật khẩu" },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
-// ================= RESET PASSWORD =================
+/* ================= RESET PASSWORD ================= */
 export const resetPassword = async (req, res, next) => {
   try {
     const { token, password } = req.body;
-    if (!token || !password) throw new AppError("Token và mật khẩu mới là bắt buộc", 400);
 
     const user = await User.findOne({
       resetPasswordToken: token,
       resetPasswordExpires: { $gt: new Date() },
     });
 
-    if (!user) throw new AppError("Token không hợp lệ hoặc đã hết hạn", 400);
+    if (!user)
+      throw new AppError("Token không hợp lệ hoặc đã hết hạn", 400);
 
     user.password = password;
     user.resetPasswordToken = null;
@@ -304,25 +289,24 @@ export const resetPassword = async (req, res, next) => {
 
     res.status(200).json({
       status: "success",
-      data: { message: "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập." },
+      data: { message: "Đổi mật khẩu thành công" },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
-// ================= CURRENT USER =================
+/* ================= CURRENT USER ================= */
 export const getCurrentUser = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).populate("addresses");
-
     if (!user) throw new AppError("Không tìm thấy người dùng", 404);
 
     res.status(200).json({
       status: "success",
       data: user.toJSON(),
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
