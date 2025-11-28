@@ -19,27 +19,24 @@ const createPaymentLink = async ({
   cancelUrl,
 }) => {
   const paymentData = {
-    orderCode,       // integer
-    amount,          // integer VND
+    orderCode,   // integer
+    amount,      // integer VND
     description,
-    items,           // [{ name, quantity, price }]
+    items,       // [{ name, quantity, price }]
     returnUrl,
     cancelUrl,
   };
 
-  // SDK NodeJS: paymentRequests.create() :contentReference[oaicite:1]{index=1}
   const paymentLink = await payOS.paymentRequests.create(paymentData);
-
-  // paymentLink.checkoutUrl là URL để redirect người dùng :contentReference[oaicite:2]{index=2}
   return paymentLink;
 };
 
 /**
  * Xác thực webhook và lấy dữ liệu thanh toán
  */
-const verifyWebhook = (payload) => {
-  // webhooks.verify() trả về dữ liệu có orderCode, amount, paymentLinkId, code, desc, ... :contentReference[oaicite:3]{index=3}
-  const data = payOS.webhooks.verify(payload);
+const verifyWebhook = async (payload) => {
+  // SDK PayOS thường sẽ verify và trả lại phần "data" đã giải mã
+  const data = await payOS.webhooks.verify(payload);
   return data;
 };
 

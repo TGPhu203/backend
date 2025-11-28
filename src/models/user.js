@@ -62,12 +62,27 @@ const userSchema = new mongoose.Schema(
       type: String,
       select: false,
     },
-
+    totalSpent: {
+      type: Number,
+      default: 0, // tổng tiền đã chi (đã hoàn tất)
+    },
+    loyaltyPoints: {
+      type: Number,
+      default: 0, // điểm tích lũy
+    },
+    loyaltyTier: {
+      type: String,
+      enum: ['none', 'silver', 'gold', 'diamond'],
+      default: 'none',
+    },
     resetPasswordToken: {
       type: String,
       select: false,
     },
-
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
     resetPasswordExpires: {
       type: Date,
       select: false,
@@ -93,7 +108,19 @@ const userSchema = new mongoose.Schema(
     toObject: { virtuals: true },
   }
 );
+userSchema.methods.updateLoyaltyTier = function () {
+  const spent = this.totalSpent || 0;
 
+  if (spent >= 50_000_000) {
+    this.loyaltyTier = 'diamond';
+  } else if (spent >= 20_000_000) {
+    this.loyaltyTier = 'gold';
+  } else if (spent >= 5_000_000) {
+    this.loyaltyTier = 'silver';
+  } else {
+    this.loyaltyTier = 'none';
+  }
+};
 /* -------------------- INDEXES -------------------- */
 // Unique email index
 userSchema.index({ email: 1 }, { unique: true });

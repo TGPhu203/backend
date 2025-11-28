@@ -19,7 +19,8 @@ import imageRoutes from './image.routes.js';
 import repairRequestsRouter from './repairRequests.js'
 // THÊM: route cấu hình bảo hành theo sản phẩm
 import productWarrantyRoutes from './productWarranties.js';
-
+import productAttributeRoutes from './productAttribute.Routes.js';
+import couponRoutes from './couponUser.routes.js.js'
 const router = express.Router();
 
 // API routes
@@ -38,11 +39,12 @@ router.use('/chatbot', chatbotRoutes);
 router.use('/warranty-packages', warrantyPackageRoutes);
 router.use('/attributes', attributeRoutes);
 router.use('/images', imageRoutes);
+router.use('/coupons', couponRoutes);
 
 // THÊM DÒNG NÀY
 router.use('/product-warranties', productWarrantyRoutes);
 router.use("/repair-requests", repairRequestsRouter);
-
+router.use('/product-attributes', productAttributeRoutes);
 // Health check route
 router.get('/health', (req, res) => {
   res.status(200).json({

@@ -7,6 +7,8 @@ import {
   Product,
   ProductVariant,
   ProductWarranty,
+  User,
+  Coupon,
 } from "../models/index.js";
 import { AppError } from "../middlewares/errorHandler.js";
 import {
@@ -15,6 +17,10 @@ import {
   sendOrderCancellationEmail,
 } from "../services/email/emailService.js";
 import { generateRandomImei } from "../utils/imei.js";
+import {
+  getDiscountPercentByTier,
+  applyOrderToUserLoyalty,
+} from "../services/loyaltyService.js";
 // helper cộng tháng
 const addMonths = (date, months) => {
   const d = new Date(date);
@@ -26,12 +32,30 @@ const addMonths = (date, months) => {
   }
   return d;
 };
+const calcLoyaltyTier = (totalSpent = 0) => {
+  if (totalSpent >= 100_000_000) return "diamond";
+  if (totalSpent >= 50_000_000) return "gold";
+  if (totalSpent >= 10_000_000) return "silver";
+  return "none";
+};
 
-// Create order from cart
+
+// helper tính điểm từ giá trị đơn
+const calcEarnedPoints = (amount = 0) => {
+  // 1 điểm / 100.000đ
+  return Math.floor(amount / 10_000);
+};
+
 export const createOrder = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const { paymentMethod, notes, shippingAddress, billingAddress } = req.body;
+    const {
+      paymentMethod,
+      notes,
+      shippingAddress,
+      billingAddress,
+      coupon,               // 👈 nhận coupon từ body
+    } = req.body;
 
     // 1. Validate shipping
     if (
@@ -43,6 +67,7 @@ export const createOrder = async (req, res, next) => {
     ) {
       throw new AppError("Thông tin giao hàng không đầy đủ", 400);
     }
+
     // 2. Lấy giỏ hàng active
     const cart = await Cart.findOne({ userId, isActive: true });
     if (!cart) throw new AppError("Giỏ hàng trống", 400);
@@ -50,23 +75,19 @@ export const createOrder = async (req, res, next) => {
     const cartItems = await CartItem.find({ cartId: cart._id })
       .populate({
         path: "productId",
-        // THÊM images vào select
-        select:
-          "name slug price thumbnail images inStock stockQuantity sku",
+        select: "name slug price thumbnail images inStock stockQuantity sku",
       })
       .populate({
         path: "variantId",
         select: "name price stockQuantity sku",
       });
 
-
     if (!cartItems.length) throw new AppError("Giỏ hàng trống", 400);
 
-    // 3. Tính tổng tiền + check tồn kho
+    // 3. Tính subtotal + check tồn kho
     let subtotal = 0;
     const taxAmount = 0;
     const shippingAmount = 0;
-    const discountAmount = 0;
 
     for (const item of cartItems) {
       const product = item.productId;
@@ -88,7 +109,74 @@ export const createOrder = async (req, res, next) => {
       subtotal += price * item.quantity;
     }
 
-    const totalAmount = subtotal + taxAmount + shippingAmount - discountAmount;
+    // ========= GIẢM GIÁ =========
+
+    // 3.5. Giảm giá loyalty (khách hàng thân thiết)
+    let loyaltyDiscount = 0;
+    const user = await User.findById(userId).select("loyaltyTier");
+    if (user) {
+      const discountPercent = await getDiscountPercentByTier(user.loyaltyTier);
+      if (discountPercent > 0) {
+        loyaltyDiscount = Math.round((subtotal * discountPercent) / 100);
+      }
+    }
+
+    // 3.6. Giảm giá coupon
+    let couponDiscount = 0;
+    let appliedCouponDoc = null;
+
+    if (coupon?.code) {
+      const code = coupon.code.toUpperCase().trim();
+
+      const c = await Coupon.findOne({ code, isActive: true });
+      if (!c) {
+        throw new AppError("Mã ưu đãi không tồn tại hoặc đã bị khóa", 400);
+      }
+
+      const now = new Date();
+      if (c.startDate && now < c.startDate) {
+        throw new AppError("Mã ưu đãi chưa đến thời gian sử dụng", 400);
+      }
+      if (c.endDate && now > c.endDate) {
+        throw new AppError("Mã ưu đãi đã hết hạn", 400);
+      }
+      if (c.minOrderAmount && subtotal < c.minOrderAmount) {
+        throw new AppError(
+          "Đơn hàng không đủ điều kiện áp dụng mã ưu đãi",
+          400
+        );
+      }
+      if (c.usageLimit && c.usageLimit > 0 && c.usedCount >= c.usageLimit) {
+        throw new AppError("Mã ưu đãi đã hết lượt sử dụng", 400);
+      }
+      if (Array.isArray(c.applicableTiers) && c.applicableTiers.length > 0) {
+        const tier = user?.loyaltyTier || "none";
+        if (!c.applicableTiers.includes(tier)) {
+          throw new AppError(
+            "Mã ưu đãi không áp dụng cho hạng thành viên hiện tại",
+            400
+          );
+        }
+      }
+
+      // tính tiền giảm
+      if (c.type === "percent") {
+        couponDiscount = Math.round((subtotal * c.value) / 100);
+      } else {
+        couponDiscount = c.value;
+      }
+
+      if (c.maxDiscount && c.maxDiscount > 0) {
+        couponDiscount = Math.min(couponDiscount, c.maxDiscount);
+      }
+
+      appliedCouponDoc = c;
+    }
+
+    // 3.7. Tổng giảm giá + tổng thanh toán
+    const discountAmount = loyaltyDiscount + couponDiscount;   // 👈 KHAI BÁO Ở ĐÂY
+    const totalAmount =
+      subtotal + taxAmount + shippingAmount - discountAmount;
 
     // 4. Tạo mã đơn
     const now = new Date();
@@ -100,6 +188,11 @@ export const createOrder = async (req, res, next) => {
       "0"
     )}`;
 
+    // Chuẩn hóa paymentMethod cho chắc
+    const safePaymentMethod = ["cod", "stripe", "payos"].includes(paymentMethod)
+      ? paymentMethod
+      : "cod";
+
     // 5. Tạo order
     const order = await Order.create({
       userId,
@@ -108,25 +201,36 @@ export const createOrder = async (req, res, next) => {
       taxAmount,
       shippingAmount,
       discountAmount,
+      loyaltyDiscountAmount: loyaltyDiscount,
+      couponDiscountAmount: couponDiscount,
+      couponCode: appliedCouponDoc?.code || null,
       totalAmount,
       currency: "VND",
       shippingAddress,
       billingAddress,
-      paymentMethod,
+      paymentMethod: safePaymentMethod,
       paymentStatus: "pending",
+      // paymentProvider để default "cod", sau này:
+      // - Stripe: set "stripe" khi tạo paymentIntent
+      // - PayOS: set "payos" trong createPayOSPaymentLink
       notes,
     });
 
+
+    // nếu dùng coupon thì tăng usedCount
+    if (appliedCouponDoc) {
+      appliedCouponDoc.usedCount = (appliedCouponDoc.usedCount || 0) + 1;
+      await appliedCouponDoc.save();
+    }
+
     const orderItems = [];
 
-    // 6. Tạo từng OrderItem + gắn bảo hành (nếu có cấu hình cho sản phẩm)
+    // 6. Tạo OrderItem + bảo hành + trừ kho (phần này giữ nguyên code cũ của bạn)
     for (const item of cartItems) {
       const product = item.productId;
       const variant = item.variantId;
       const price = variant ? variant.price : product.price;
 
-      // ===== LẤY GÓI BẢO HÀNH MẶC ĐỊNH CỦA SẢN PHẨM =====
-      // CHỈ filter productId + isDefault, KHÔNG có isActive
       const pw = await ProductWarranty.findOne({
         productId: product._id,
         isDefault: true,
@@ -138,34 +242,30 @@ export const createOrder = async (req, res, next) => {
       let warrantyStatus = "void";
 
       if (pw && pw.warrantyPackageId) {
-        const pkg = pw.warrantyPackageId;          // WarrantyPackage
+        const pkg = pw.warrantyPackageId;
         warrantyPackageId = pkg._id;
-        warrantyStartAt = new Date();              // ngày kích hoạt bảo hành
+        warrantyStartAt = new Date();
         const duration = pkg.durationMonths || 0;
-        warrantyEndAt =
-          duration > 0 ? addMonths(warrantyStartAt, duration) : null;
-        warrantyStatus = "active";                 // ĐÃ CÓ BẢO HÀNH
+        warrantyEndAt = duration > 0 ? addMonths(warrantyStartAt, duration) : null;
+        warrantyStatus = "active";
       }
 
-      // ===== SINH IMEI =====
       const imei = generateRandomImei();
 
       const payload = {
         orderId: order._id,
         productId: product._id,
         variantId: variant ? variant._id : null,
-
         name: product.name,
         variantName: variant ? variant.name : null,
         sku: variant ? variant.sku : product.sku,
         image:
-        product.thumbnail ||
-        (Array.isArray(product.images) && product.images[0]) ||
-        null,
+          product.thumbnail ||
+          (Array.isArray(product.images) && product.images[0]) ||
+          null,
         price,
         quantity: item.quantity,
         totalPrice: price * item.quantity,
-
         imei,
         warrantyPackageId,
         warrantyStartAt,
@@ -176,7 +276,6 @@ export const createOrder = async (req, res, next) => {
       const oItem = await OrderItem.create(payload);
       orderItems.push(oItem);
 
-      // trừ tồn kho
       if (variant) {
         await ProductVariant.findByIdAndUpdate(variant._id, {
           $inc: { stockQuantity: -item.quantity },
@@ -188,12 +287,11 @@ export const createOrder = async (req, res, next) => {
       }
     }
 
-
     // 7. Clear cart
     await Cart.findByIdAndUpdate(cart._id, { isActive: false });
     await CartItem.deleteMany({ cartId: cart._id });
 
-    // 8. Gửi email xác nhận
+    // 8. Gửi email (giữ nguyên đoạn của bạn)
     try {
       await sendOrderConfirmationEmail(req.user.email, {
         orderNumber: order.orderNumber,
@@ -227,6 +325,7 @@ export const createOrder = async (req, res, next) => {
     next(err);
   }
 };
+
 // Get user orders
 export const getUserOrders = async (req, res, next) => {
   try {
@@ -419,7 +518,6 @@ export const getAllOrders = async (req, res, next) => {
     next(error);
   }
 };
-
 // Update order status (Admin)
 export const updateOrderStatus = async (req, res, next) => {
   try {
@@ -437,8 +535,23 @@ export const updateOrderStatus = async (req, res, next) => {
     if (notes) order.notes = notes;
     await order.save();
 
+    // 🔹 LẦN ĐẦU CHUYỂN SANG completed => cộng chi tiêu + điểm
+    if (oldStatus !== "completed" && status === "completed") {
+      const amount = order.totalAmount || 0;
+      const user = await User.findById(order.userId);
+
+      if (user) {
+        const earned = Math.floor(amount / 10000); // 1 điểm / 100k
+        user.loyaltyPoints = (user.loyaltyPoints || 0) + earned;
+        user.totalSpent = (user.totalSpent || 0) + amount;
+        user.updateLoyaltyTier();                   // dùng method trong schema
+        await user.save();
+      }
+    }
+
+
     await sendOrderStatusUpdateEmail(order.userId.email, {
-      orderNumber: order.orderNumber, // dùng orderNumber
+      orderNumber: order.orderNumber,
       oldStatus,
       newStatus: status,
       customerName: `${order.userId.firstName} ${order.userId.lastName}`,
@@ -452,6 +565,7 @@ export const updateOrderStatus = async (req, res, next) => {
     next(error);
   }
 };
+
 
 // Repay order
 export const repayOrder = async (req, res, next) => {

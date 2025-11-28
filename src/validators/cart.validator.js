@@ -32,3 +32,9 @@ const cartItemSchema = Joi.object({
 export const syncCartSchema = Joi.object({
   items: Joi.array().items(cartItemSchema).required(),
 });
+export const applyCouponSchema = Joi.object({
+  code: Joi.string().trim().required().messages({
+    'string.empty': 'Vui lòng nhập mã khuyến mãi',
+    'any.required': 'Mã khuyến mãi là bắt buộc',
+  }),
+});

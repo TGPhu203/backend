@@ -1,9 +1,18 @@
-const { AppError } = require('./errorHandler');
+// middlewares/validate.js
+import { AppError } from "./errorHandler.js";
 
-// Validation middleware
-const validate = (schema) => {
+/**
+ * Middleware validate body bằng Joi schema
+ * Dùng: router.post("/", validate(productSchema), controller.createProduct)
+ */
+export const validate = (schema) => {
   return (req, res, next) => {
-    const { error } = schema.validate(req.body, {
+    if (!schema || typeof schema.validate !== "function") {
+      // Nếu truyền nhầm không phải Joi schema thì bỏ qua, tránh lỗi .validate is not a function
+      return next();
+    }
+
+    const { error, value } = schema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true,
     });
@@ -14,11 +23,11 @@ const validate = (schema) => {
         message: detail.message,
       }));
 
-      return next(new AppError('Validation error', 400, { errors }));
+      return next(new AppError("Validation error", 400, { errors }));
     }
 
+    // gán lại body đã stripUnknown / apply default
+    req.body = value;
     next();
   };
 };
-
-module.exports = validate;

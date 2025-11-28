@@ -60,7 +60,7 @@ export const createProductValidation = [
 ];
 
 export const updateProductValidation = [
-  param('id').isUUID().withMessage('Product ID không hợp lệ'),
+  param("id").isMongoId().withMessage("Product ID không hợp lệ"),
 
   body('name')
     .optional()
@@ -120,7 +120,7 @@ export const updateProductValidation = [
 ];
 
 export const updateUserValidation = [
-  param('id').isUUID().withMessage('User ID không hợp lệ'),
+  param("id").isMongoId().withMessage("Product ID không hợp lệ"),
 
   body('firstName')
     .optional()
@@ -151,16 +151,24 @@ export const updateUserValidation = [
 ];
 
 export const updateOrderStatusValidation = [
-  param('id').isUUID().withMessage('Order ID không hợp lệ'),
+  param("id").isMongoId().withMessage("Order ID không hợp lệ"),
 
-  body('status')
-    .isIn(['pending', 'processing', 'shipped', 'delivered', 'cancelled'])
-    .withMessage('Trạng thái đơn hàng không hợp lệ'),
+  body("status")
+    .isIn([
+      "pending",
+      "confirmed",
+      "processing",
+      "shipped",
+      "completed",
+      "cancelled",
+    ])
+    .withMessage("Trạng thái đơn hàng không hợp lệ"),
 
-  body('note')
+  // backend đang dùng field `notes` chứ không phải `note`
+  body("notes")
     .optional()
     .isLength({ max: 500 })
-    .withMessage('Ghi chú không được vượt quá 500 ký tự'),
+    .withMessage("Ghi chú không được vượt quá 500 ký tự"),
 ];
 
 export const paginationValidation = [
@@ -199,6 +207,8 @@ export const statsValidation = [
     .withMessage('GroupBy phải là hour, day, week hoặc month'),
 ];
 
-export const deleteValidation = [param('id').isUUID().withMessage('ID không hợp lệ')];
+export const deleteValidation = [  param("id").isMongoId().withMessage("Product ID không hợp lệ"),
+];
 
-export const getByIdValidation = [param('id').isUUID().withMessage('ID không hợp lệ')];
+export const getByIdValidation = [  param("id").isMongoId().withMessage("Product ID không hợp lệ"),
+];

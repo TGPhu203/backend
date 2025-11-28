@@ -160,10 +160,11 @@ productSchema.virtual('reviews', {
 });
 
 productSchema.virtual('productSpecifications', {
-  ref: 'ProductSpecification',
+  ref: 'ProductAttribute',
   localField: '_id',
   foreignField: 'productId',
 });
+
 
 productSchema.virtual('defaultVariant', {
   ref: 'ProductVariant',

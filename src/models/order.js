@@ -1,3 +1,4 @@
+// models/order.js
 import mongoose from 'mongoose';
 
 const orderSchema = new mongoose.Schema(
@@ -15,22 +16,34 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
-      default: 'pending',
+      enum: [
+        "pending",
+        "confirmed",
+        "processing",
+        "shipped",
+        "completed",
+        "cancelled",
+      ],
+      default: "pending",
     },
+
     paymentStatus: {
       type: String,
       enum: ['pending', 'paid', 'failed', 'refunded'],
       default: 'pending',
     },
+
+    // ✅ THÊM "payos" VÀO ENUM
     paymentMethod: {
       type: String,
-      enum: ['stripe', 'paypal', 'cod', 'bank_transfer'],
+      enum: ['stripe', 'paypal', 'cod', 'bank_transfer', 'payos'],
       default: 'cod',
     },
-    paymentIntentId: {
-      type: String,
-    },
+
+    // dùng chung cho Stripe/PayOS
+    paymentTransactionId: { type: String },
+    paymentIntentId: { type: String },
+
     subtotal: {
       type: Number,
       required: [true, 'Subtotal is required'],
@@ -46,11 +59,29 @@ const orderSchema = new mongoose.Schema(
       default: 0,
       min: [0, 'Shipping amount cannot be negative'],
     },
+
+    // tổng giảm giá (loyalty + coupon)
     discountAmount: {
       type: Number,
       default: 0,
       min: [0, 'Discount amount cannot be negative'],
     },
+
+    loyaltyDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Loyalty discount cannot be negative'],
+    },
+    couponDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Coupon discount cannot be negative'],
+    },
+
+    couponCode: {
+      type: String,
+    },
+
     totalAmount: {
       type: Number,
       required: [true, 'Total amount is required'],
@@ -70,9 +101,16 @@ const orderSchema = new mongoose.Schema(
       postalCode: { type: String, required: true },
       country: { type: String, default: 'Vietnam' },
     },
-    paymentProvider: { type: String, enum: ["stripe", "payos", "cod"], default: "cod" },
+
+    // ✅ provider dùng cho xử lý thanh toán
+    paymentProvider: {
+      type: String,
+      enum: ["stripe", "payos", "cod"],
+      default: "cod",
+    },
     paymentOrderCode: { type: Number },
     paymentLinkId: { type: String },
+
     billingAddress: {
       fullName: { type: String },
       phone: { type: String },
@@ -121,7 +159,9 @@ orderSchema.virtual('items', {
 orderSchema.pre('save', function (next) {
   if (this.isNew && !this.orderNumber) {
     const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const random = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, '0');
     this.orderNumber = `ORD-${timestamp}-${random}`;
   }
   next();

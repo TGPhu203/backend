@@ -1,33 +1,40 @@
 // src/controllers/wishlist.controller.js
-import { Wishlist, Product } from '../models/index.js';
+import Wishlist from '../models/wishlist.js';
+import Product from '../models/product.js';
 import { AppError } from '../middlewares/errorHandler.js';
 
-// Get user wishlist
+// Lấy danh sách wishlist (trả về chính danh sách product)
 export const getWishlist = async (req, res, next) => {
   try {
     const userId = req.user.id;
 
-    const user = await Wishlist.findOne({ userId }).populate('products', [
-      'id',
+    const docs = await Wishlist.find({ userId }).populate('productId', [
+      '_id',
       'name',
       'slug',
       'price',
       'compareAtPrice',
       'thumbnail',
+      'images',
       'inStock',
       'stockQuantity',
     ]);
 
+    // docs: [{ _id, userId, productId: { ...product } }, ...]
+    const products = docs
+      .map((d) => d.productId)
+      .filter(Boolean); // đề phòng product đã bị xoá
+
     res.status(200).json({
       status: 'success',
-      data: user ? user.products : [],
+      data: products,
     });
   } catch (error) {
     next(error);
   }
 };
 
-// Add product to wishlist
+// Thêm sản phẩm vào wishlist
 export const addToWishlist = async (req, res, next) => {
   try {
     const { productId } = req.body;
@@ -38,20 +45,16 @@ export const addToWishlist = async (req, res, next) => {
       throw new AppError('Sản phẩm không tồn tại', 404);
     }
 
-    let wishlist = await Wishlist.findOne({ userId });
-    if (!wishlist) {
-      wishlist = new Wishlist({ userId, products: [] });
-    }
-
-    if (wishlist.products.includes(productId)) {
+    // schema hiện tại dùng mỗi dòng cho 1 sản phẩm
+    const existed = await Wishlist.findOne({ userId, productId });
+    if (existed) {
       return res.status(200).json({
         status: 'success',
         message: 'Sản phẩm đã có trong danh sách yêu thích',
       });
     }
 
-    wishlist.products.push(productId);
-    await wishlist.save();
+    await Wishlist.create({ userId, productId });
 
     res.status(201).json({
       status: 'success',
@@ -62,19 +65,16 @@ export const addToWishlist = async (req, res, next) => {
   }
 };
 
-// Remove product from wishlist
+// Xoá 1 sản phẩm khỏi wishlist
 export const removeFromWishlist = async (req, res, next) => {
   try {
     const { productId } = req.params;
     const userId = req.user.id;
 
-    const wishlist = await Wishlist.findOne({ userId });
-    if (!wishlist || !wishlist.products.includes(productId)) {
+    const deleted = await Wishlist.findOneAndDelete({ userId, productId });
+    if (!deleted) {
       throw new AppError('Sản phẩm không có trong danh sách yêu thích', 404);
     }
-
-    wishlist.products = wishlist.products.filter(id => id.toString() !== productId);
-    await wishlist.save();
 
     res.status(200).json({
       status: 'success',
@@ -85,18 +85,18 @@ export const removeFromWishlist = async (req, res, next) => {
   }
 };
 
-// Check if product is in wishlist
+// Kiểm tra 1 product có trong wishlist hay chưa
 export const checkWishlist = async (req, res, next) => {
   try {
     const { productId } = req.params;
     const userId = req.user.id;
 
-    const wishlist = await Wishlist.findOne({ userId });
+    const existed = await Wishlist.findOne({ userId, productId });
 
     res.status(200).json({
       status: 'success',
       data: {
-        inWishlist: wishlist ? wishlist.products.includes(productId) : false,
+        inWishlist: !!existed,
       },
     });
   } catch (error) {
@@ -104,12 +104,12 @@ export const checkWishlist = async (req, res, next) => {
   }
 };
 
-// Clear wishlist
+// Xoá toàn bộ wishlist
 export const clearWishlist = async (req, res, next) => {
   try {
     const userId = req.user.id;
 
-    await Wishlist.findOneAndDelete({ userId });
+    await Wishlist.deleteMany({ userId });
 
     res.status(200).json({
       status: 'success',

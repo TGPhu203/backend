@@ -49,8 +49,6 @@ export const register = async (req, res, next) => {
     next(err);
   }
 };
-
-/* ================= LOGIN ================= */
 export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -58,12 +56,22 @@ export const login = async (req, res, next) => {
     if (!email || !password)
       throw new AppError("Email và mật khẩu là bắt buộc", 400);
 
+    // lấy thêm password để so sánh, các field khác lấy bình thường
     const user = await User.findOne({ email }).select("+password");
     if (!user) throw new AppError("Email hoặc mật khẩu không đúng", 401);
     if (!user.isActive) throw new AppError("Tài khoản bị khóa", 401);
 
     const match = await user.comparePassword(password);
     if (!match) throw new AppError("Email hoặc mật khẩu không đúng", 401);
+    if (user.isBlocked) {
+      return res.status(403).json({
+        status: "error",
+        message: "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hỗ trợ.",
+      });
+    }
+    // cập nhật hạng thành viên theo totalSpent hiện tại
+    user.updateLoyaltyTier();
+    await user.save();
 
     const token = signToken(
       { id: user._id, role: user.role },
@@ -77,11 +85,11 @@ export const login = async (req, res, next) => {
       "7d"
     );
 
-    /* Cookie cross-site */
+    // cookie
     res.cookie("token", token, {
       httpOnly: true,
       secure: false,
-      sameSite: "lax",      
+      sameSite: "lax",
       path: "/",
       maxAge: 24 * 3600 * 1000,
     });
@@ -90,27 +98,33 @@ export const login = async (req, res, next) => {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      
       path: "/",
       maxAge: 7 * 24 * 3600 * 1000,
     });
+
+    const safe = user.toJSON(); // đã bỏ password trong schema
 
     res.status(200).json({
       status: "success",
       data: {
         user: {
-          _id: user._id,
-          email: user.email,
-          fullName: `${user.firstName} ${user.lastName}`,
-          role: user.role,
-          isActive: user.isActive,
-          isEmailVerified: user.isEmailVerified,
+          id: safe._id,
+          email: safe.email,
+          firstName: safe.firstName,
+          lastName: safe.lastName,
+          fullName: safe.fullName,
+          avatar: safe.avatar,
+          role: safe.role,
+          isActive: safe.isActive,
+          isEmailVerified: safe.isEmailVerified,
+          totalSpent: safe.totalSpent,
+          loyaltyTier: safe.loyaltyTier,
+          loyaltyPoints: safe.loyaltyPoints,
         },
         token,
-        refreshToken
+        refreshToken,
       },
     });
-    
   } catch (err) {
     next(err);
   }
@@ -222,11 +236,11 @@ export const refreshToken = async (req, res, next) => {
       "1d"
     );
 
-    res.cookie("token", newToken, { 
+    res.cookie("token", newToken, {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      
+
       path: "/",
       maxAge: 24 * 3600 * 1000,
     });

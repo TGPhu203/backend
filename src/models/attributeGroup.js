@@ -1,3 +1,4 @@
+// models/attributeGroup.model.js
 import mongoose from 'mongoose';
 
 const attributeGroupSchema = new mongoose.Schema(
@@ -11,10 +12,26 @@ const attributeGroupSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    displayOrder: {
+
+    // KIỂU NHÓM: select, color, text...
+    type: {
+      type: String,
+      enum: ['select', 'color', 'text', 'number'],
+      default: 'select',
+    },
+
+    // Có bắt buộc chọn không
+    isRequired: {
+      type: Boolean,
+      default: false,
+    },
+
+    // Thứ tự hiển thị
+    sortOrder: {
       type: Number,
       default: 0,
     },
+
     isActive: {
       type: Boolean,
       default: true,
@@ -29,7 +46,7 @@ const attributeGroupSchema = new mongoose.Schema(
 
 // Indexes
 attributeGroupSchema.index({ isActive: 1 });
-attributeGroupSchema.index({ displayOrder: 1 });
+attributeGroupSchema.index({ sortOrder: 1 });
 
 // Virtual for values
 attributeGroupSchema.virtual('values', {

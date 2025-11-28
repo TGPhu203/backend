@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';  
 import { Category, Product } from '../models/index.js';
 import { AppError } from '../middlewares/errorHandler.js';
 
@@ -113,25 +114,39 @@ export const getCategoryBySlug = async (req, res, next) => {
     next(error);
   }
 };
-
-// Create category
 export const createCategory = async (req, res, next) => {
   try {
-    const { name, description, image, parentId, isActive, sortOrder } = req.body;
+    let { name, description, image, parentId, isActive, displayOrder } = req.body;
 
+    if (!name || !name.trim()) {
+      throw new AppError('Tên danh mục là bắt buộc', 400);
+    }
+
+    // Chuẩn hóa parentId
+    if (!parentId || parentId === 'none' || parentId === 'null') {
+      parentId = null;
+    }
+
+    // Validate parentId nếu có
     if (parentId) {
+      if (!mongoose.Types.ObjectId.isValid(parentId)) {
+        throw new AppError('Danh mục cha không hợp lệ', 400);
+      }
+
       const parentCategory = await Category.findById(parentId);
-      if (!parentCategory) throw new AppError('Danh mục cha không tồn tại', 400);
+      if (!parentCategory) {
+        throw new AppError('Danh mục cha không tồn tại', 400);
+      }
     }
 
     const category = new Category({
-      name,
+      name: name.trim(),
       description,
       image,
       parentId,
-      isActive,
-      sortOrder,
-      level: parentId ? 2 : 1,
+      isActive: isActive !== false, // default true
+      displayOrder: Number.isFinite(+displayOrder) ? +displayOrder : 0,
+      // level backend sẽ tự set trong pre('save') của schema
     });
 
     await category.save();
@@ -144,7 +159,6 @@ export const createCategory = async (req, res, next) => {
     next(error);
   }
 };
-
 // Update category
 export const updateCategory = async (req, res, next) => {
   try {

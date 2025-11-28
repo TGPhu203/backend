@@ -7,6 +7,13 @@ import { Order } from "../models/index.js";
  * - monthly: 12 tháng gần nhất
  * - yearly: 5 năm gần nhất
  */
+const paidOrderMatchBase = {
+  $or: [
+    { paymentStatus: "paid", status: { $ne: "cancelled" } }, // online đã thanh toán, không tính cancelled
+    { paymentMethod: "cod", status: "completed" },           // COD đã giao xong
+  ],
+  paymentStatus: { $ne: "refunded" }, // loại đơn đã hoàn tiền
+};
 const parseDateRange = (from, to, fallbackDays = 30) => {
   let start;
   let end;
@@ -40,8 +47,7 @@ export const getDailyRevenue = async (req, res, next) => {
     const { start, end } = parseDateRange(from, to, 30);
 
     const match = {
-      paymentStatus: "paid",
-      status: { $ne: "cancelled" },
+      ...paidOrderMatchBase,
       createdAt: { $gte: start, $lte: end },
     };
 
@@ -110,8 +116,7 @@ export const getMonthlyRevenue = async (req, res, next) => {
     const { start, end } = parseDateRange(from, to, 365);
 
     const match = {
-      paymentStatus: "paid",
-      status: { $ne: "cancelled" },
+      ...paidOrderMatchBase,
       createdAt: { $gte: start, $lte: end },
     };
 
@@ -183,8 +188,7 @@ export const getYearlyRevenue = async (req, res, next) => {
     const { start, end } = parseDateRange(from, to, 365 * 5);
 
     const match = {
-      paymentStatus: "paid",
-      status: { $ne: "cancelled" },
+      ...paidOrderMatchBase,
       createdAt: { $gte: start, $lte: end },
     };
 

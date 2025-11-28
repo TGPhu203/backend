@@ -8,62 +8,63 @@ export async function getDashboardStats(req, res) {
   try {
     const now = new Date();
 
-    // Thời gian cho so sánh theo tháng
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-
-    // 7 ngày gần đây
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
+    // 👉 CHỈ ĐƠN ĐÃ THANH TOÁN THÀNH CÔNG
+    const paidOrderMatch = {
+      $or: [
+        { paymentStatus: "paid" },                     // PayOS / online paid
+        { paymentMethod: "cod", status: "completed" }, // COD đã giao thành công
+      ],
+      paymentStatus: { $ne: "refunded" },              // loại đơn đã hoàn tiền
+    };
+
     const [
-      // Tổng doanh thu (từ trước tới giờ)
       totalRevenueAgg,
-      // Doanh thu tháng này
       thisMonthRevenueAgg,
-      // Doanh thu tháng trước
       lastMonthRevenueAgg,
-      // Đơn hàng mới 7 ngày gần đây
       newOrdersCount,
-      // Tổng sản phẩm
       productsCount,
-      // Sản phẩm mới trong tháng này
       newProductsCount,
-      // Tổng khách hàng (loại trừ admin nếu bạn có field role)
       customersCount,
-      // Khách hàng mới trong tháng này
       newCustomersCount,
-      // 5 đơn gần nhất
       recentOrders,
-      // Nếu có model RepairRequest thì bỏ comment và thêm import
-      // serviceRequestsAgg,
     ] = await Promise.all([
+      // Tổng doanh thu – chỉ đơn đã thanh toán
       Order.aggregate([
+        { $match: paidOrderMatch },
         {
           $group: {
             _id: null,
-            total: { $sum: '$totalAmount' },
+            total: { $sum: "$totalAmount" },
           },
         },
       ]),
 
+      // Doanh thu tháng này
       Order.aggregate([
         {
           $match: {
+            ...paidOrderMatch,
             createdAt: { $gte: startOfThisMonth },
           },
         },
         {
           $group: {
             _id: null,
-            total: { $sum: '$totalAmount' },
+            total: { $sum: "$totalAmount" },
           },
         },
       ]),
 
+      // Doanh thu tháng trước
       Order.aggregate([
         {
           $match: {
+            ...paidOrderMatch,
             createdAt: {
               $gte: startOfLastMonth,
               $lte: endOfLastMonth,
@@ -73,29 +74,31 @@ export async function getDashboardStats(req, res) {
         {
           $group: {
             _id: null,
-            total: { $sum: '$totalAmount' },
+            total: { $sum: "$totalAmount" },
           },
         },
       ]),
 
-      Order.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+      // Số đơn mới 7 ngày gần đây – tuỳ bạn muốn tính tất cả hay chỉ đơn đã thanh toán
+      Order.countDocuments({
+        createdAt: { $gte: sevenDaysAgo },
+        ...paidOrderMatch, // nếu chỉ muốn tính đơn đã thanh toán
+      }),
 
       Product.countDocuments({}),
       Product.countDocuments({ createdAt: { $gte: startOfThisMonth } }),
 
-      // Nếu có field role thì lọc bỏ admin:
-      // User.countDocuments({ role: { $ne: 'admin' } }),
       User.countDocuments({}),
       User.countDocuments({ createdAt: { $gte: startOfThisMonth } }),
 
-      Order.find({})
+      // Đơn gần đây, thường mình muốn xem cả pending, nên có 2 lựa chọn:
+      //  (a) chỉ đơn đã thanh toán: .find({...paidOrderMatch})
+      //  (b) tất cả đơn: .find({})
+      Order.find({ ...paidOrderMatch })
         .sort({ createdAt: -1 })
         .limit(5)
-        .populate('userId', 'firstName lastName email')
+        .populate("userId", "firstName lastName email")
         .lean(),
-
-      // Ví dụ nếu sau này có RepairRequest:
-      // RepairRequest.find({}).sort({ createdAt: -1 }).limit(5).lean(),
     ]);
 
     const totalRevenue = totalRevenueAgg[0]?.total || 0;
@@ -107,49 +110,34 @@ export async function getDashboardStats(req, res) {
         ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
         : null;
 
-    // Tăng trưởng khách hàng tháng này vs tổng
     const customersChangePercent =
-      customersCount > 0
-        ? (newCustomersCount / customersCount) * 100
-        : null;
+      customersCount > 0 ? (newCustomersCount / customersCount) * 100 : null;
 
-    // Map recentOrders cho FE dùng ở phần "Đơn hàng gần đây"
     const recentOrdersFormatted = recentOrders.map((o) => ({
       id: o._id,
       orderNumber: o.orderNumber,
       customerName:
         o.shippingAddress?.fullName ||
-        `${o.userId?.firstName || ''} ${o.userId?.lastName || ''}`.trim() ||
+        `${o.userId?.firstName || ""} ${o.userId?.lastName || ""}`.trim() ||
         o.userId?.email ||
-        'Khách lẻ',
+        "Khách lẻ",
       totalAmount: o.totalAmount,
       status: o.status,
       createdAt: o.createdAt,
     }));
 
-    // Nếu có RepairRequest thì có thể map thêm phần này cho "Yêu cầu dịch vụ"
-    // const serviceRequests = serviceRequestsAgg.map((r) => ({
-    //   id: r._id,
-    //   type: r.type,        // ví dụ: 'Bảo hành', 'Sửa chữa', ...
-    //   status: r.status,    // ví dụ: 'new' | 'in_progress' | 'completed'
-    //   priority: r.priority // ví dụ: 'high' | 'medium' | 'low'
-    // }));
-
     res.status(200).json({
-      status: 'success',
+      status: "success",
       data: {
-        // 4 card trên cùng trong FE
         cards: {
           revenue: {
-            // Tổng doanh thu (có thể FE format ra ₫xx.xM)
-            value: totalRevenue, // number
+            value: totalRevenue,
             thisMonth: thisMonthRevenue,
             lastMonth: lastMonthRevenue,
-            changePercent: revenueChangePercent, // để FE render "+12% so với tháng trước"
+            changePercent: revenueChangePercent,
           },
           newOrders: {
             value: newOrdersCount,
-            // bạn có thể tính thêm so sánh với 7 ngày trước đó nếu muốn
           },
           products: {
             value: productsCount,
@@ -161,19 +149,15 @@ export async function getDashboardStats(req, res) {
             changePercent: customersChangePercent,
           },
         },
-
-        // Phần "Đơn hàng gần đây"
         recentOrders: recentOrdersFormatted,
-
-        // Phần "Yêu cầu dịch vụ" – nếu dùng data thật thì mở comment ở trên
-        // serviceRequests,
       },
     });
   } catch (err) {
-    console.error('getDashboardStats error:', err);
-    res.status(500).json({ status: 'error', message: err.message });
+    console.error("getDashboardStats error:", err);
+    res.status(500).json({ status: "error", message: err.message });
   }
 }
+
 
 export async function getDetailedStats(req, res) {
   try {
@@ -191,48 +175,76 @@ export async function getDetailedStats(req, res) {
  */
 async function getAllUsers(req, res) {
   try {
-    // 1) Lấy tất cả user
-    const users = await User.find().lean();
+    const users = await User.find({ role: "customer" })   // 👈 chỉ lấy khách hàng
+      .select(
+        "firstName lastName email phone loyaltyTier loyaltyPoints role createdAt isBlocked"
+      )
+      .lean();
 
-    // 2) Gom đơn hàng theo userId
+
+    const userIds = users.map((u) => u._id);
+
     const stats = await Order.aggregate([
       {
+        $match: {
+          userId: { $in: userIds },
+          $or: [
+            { paymentStatus: "paid", status: { $ne: "cancelled" } },
+            { paymentMethod: "cod", status: "completed" },
+          ],
+          paymentStatus: { $ne: "refunded" },
+        },
+      },
+      {
         $group: {
-          _id: "$userId",                  // mỗi userId 1 dòng
-          orderCount: { $sum: 1 },         // số đơn
-          totalSpent: { $sum: "$totalAmount" }, // tổng chi tiêu
+          _id: "$userId",
+          orderCount: { $sum: 1 },
+          totalSpent: { $sum: "$totalAmount" },
         },
       },
     ]);
 
-    // 3) Đưa stats vào map để tra nhanh
     const statsMap = new Map(
       stats.map((s) => [
-        s._id?.toString(),                 // key: userId (string)
+        s._id.toString(),
         { orderCount: s.orderCount, totalSpent: s.totalSpent },
       ])
     );
 
-    // 4) Gộp user + stats
     const usersWithStats = users.map((u) => {
-      const st = statsMap.get(u._id.toString()) || {
-        orderCount: 0,
-        totalSpent: 0,
-      };
+      const st =
+        statsMap.get(u._id.toString()) || {
+          orderCount: 0,
+          totalSpent: 0,
+        };
+
+      const mergedTotalSpent = st.totalSpent || 0;
+
       return {
-        ...u,
+        _id: u._id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        phone: u.phone,
         orderCount: st.orderCount,
-        totalSpent: st.totalSpent,
+        totalSpent: mergedTotalSpent,
+        loyaltyTier: u.loyaltyTier || "none",
+        loyaltyPoints: u.loyaltyPoints || 0,
+        role: u.role,
+        createdAt: u.createdAt,
+        isBlocked: u.isBlocked || false,
       };
     });
 
-    // Có thể trả thẳng mảng hoặc bọc trong { status, data }
     res.status(200).json({
       status: "success",
       data: usersWithStats,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("getAllUsers error:", err);
+    res
+      .status(500)
+      .json({ status: "error", message: err.message || "Lỗi server" });
   }
 }
 
@@ -244,23 +256,87 @@ async function updateUser(req, res) {
     if (user) {
       res.json(user);
     } else {
-      res.status(404).json({ message: 'User not found' });
+      res.status(404).json({ message: "User not found" });
+    }
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+}
+async function deleteUser(req, res) {
+  try {
+    const { id } = req.params;
+
+    // không cho tự xoá chính mình
+    if (req.user?.id && req.user.id === id) {
+      return res
+        .status(400)
+        .json({ message: "Bạn không thể tự xóa tài khoản của chính mình" });
+    }
+
+    const user = await User.findByIdAndDelete(id);
+    if (user) {
+      res.json({ message: "User deleted" });
+    } else {
+      res.status(404).json({ message: "User not found" });
     }
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 }
 
-async function deleteUser(req, res) {
+// 🔒 Khóa tài khoản
+async function blockUser(req, res) {
   try {
     const { id } = req.params;
-    const user = await User.findByIdAndDelete(id);
-    if (user) {
-      res.json({ message: 'User deleted' });
-    } else {
-      res.status(404).json({ message: 'User not found' });
+
+    // không cho tự khóa chính mình
+    if (req.user?.id && req.user.id === id) {
+      return res
+        .status(400)
+        .json({ message: "Bạn không thể tự khóa tài khoản của chính mình" });
     }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { isBlocked: true },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: user,
+    });
   } catch (err) {
+    console.error("blockUser error:", err);
+    res.status(500).json({ message: err.message });
+  }
+}
+
+// 🔓 Mở khóa tài khoản
+async function unblockUser(req, res) {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { isBlocked: false },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: user,
+    });
+  } catch (err) {
+    console.error("unblockUser error:", err);
     res.status(500).json({ message: err.message });
   }
 }
@@ -432,4 +508,6 @@ export default {
   deleteReview,
   getAllOrders,
   updateOrderStatus,
+  unblockUser,
+  blockUser,
 };

@@ -1,5 +1,6 @@
 // validators/order.validator.js
 import Joi from 'joi';
+import { body, param } from "express-validator";
 
 // Create order validation schema
 export const createOrderSchema = Joi.object({
@@ -75,12 +76,25 @@ export const createOrderSchema = Joi.object({
 });
 
 // Update order status validation schema
-export const updateOrderStatusSchema = Joi.object({
-  status: Joi.string()
-    .valid('pending', 'processing', 'shipped', 'delivered', 'cancelled')
-    .required()
-    .messages({
-      'any.only': 'Trạng thái đơn hàng không hợp lệ',
-      'any.required': 'Trạng thái đơn hàng là trường bắt buộc',
-    }),
-});
+// validators/order.validator.js
+
+export const updateOrderStatusSchema = [
+  param("id").isMongoId().withMessage("Order ID không hợp lệ"),
+
+  body("status")
+    .isIn([
+      "pending",
+      "confirmed",
+      "processing",
+      "shipped",
+      "completed",
+      "cancelled",
+    ])
+    .withMessage("Trạng thái đơn hàng không hợp lệ"),
+
+  body("notes")
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage("Ghi chú không được vượt quá 500 ký tự"),
+];
+

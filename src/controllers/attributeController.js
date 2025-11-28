@@ -33,34 +33,34 @@ const getAttributeGroups = async (req, res) => {
   }
 };
 
-// Get attribute groups for a specific product
 const getProductAttributeGroups = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const product = await Product.findById(productId).populate({
-      path: 'attributeGroups',
-      populate: {
-        path: 'attributeGroup',
-        match: { isActive: true },
-        populate: {
-          path: 'values',
-          match: { isActive: true },
-          options: { sort: { sortOrder: 1, name: 1 } },
-        },
-      },
-    });
-
-    if (!product) {
+    // kiểm tra product tồn tại (optional nhưng nên có)
+    const productExists = await Product.exists({ _id: productId });
+    if (!productExists) {
       return res.status(404).json({
         success: false,
         message: 'Product not found',
       });
     }
 
+    const groups = await ProductAttributeGroup.find({ productId })
+      .populate({
+        path: 'attributeGroupId',
+        match: { isActive: true },
+        populate: {
+          path: 'values',
+          match: { isActive: true },
+          options: { sort: { sortOrder: 1, name: 1 } },
+        },
+      })
+      .sort({ sortOrder: 1 });
+
     res.json({
       success: true,
-      data: product.attributeGroups,
+      data: groups,
     });
   } catch (error) {
     console.error('Error fetching product attribute groups:', error);
@@ -143,20 +143,38 @@ const addAttributeValue = async (req, res) => {
     });
   }
 };
-
 // Assign attribute group to product
 const assignAttributeGroupToProduct = async (req, res) => {
   try {
     const { productId, attributeGroupId } = req.params;
     const { isRequired, sortOrder } = req.body;
 
-    const assignment = new ProductAttributeGroup({
-      productId,
-      attributeGroupId,
-      isRequired,
-      sortOrder,
+    // optional: kiểm tra group tồn tại và đang active
+    const group = await AttributeGroup.findOne({
+      _id: attributeGroupId,
+      isActive: true,
     });
-    await assignment.save();
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attribute group not found or inactive',
+      });
+    }
+
+    const assignment = await ProductAttributeGroup.findOneAndUpdate(
+      { productId, attributeGroupId },
+      {
+        productId,
+        attributeGroupId,
+        isRequired: !!isRequired,
+        sortOrder: sortOrder ?? 0,
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      }
+    );
 
     res.status(201).json({
       success: true,
@@ -476,7 +494,58 @@ const getPopularAttributeCombinations = async (productId) => {
     return [];
   }
 };
+const removeAttributeGroupFromProduct = async (req, res) => {
+  try {
+    const { productId, attributeGroupId } = req.params;
 
+    const deleted = await ProductAttributeGroup.findOneAndDelete({
+      productId,
+      attributeGroupId,
+    });
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product attribute group not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Attribute group removed from product successfully',
+    });
+  } catch (error) {
+    console.error('Error removing attribute group from product:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to remove attribute group from product',
+      error: error.message,
+    });
+  }
+};
+const getAttributeValuesByGroup = async (req, res) => {
+  try {
+    const { attributeGroupId } = req.params;
+
+    const values = await AttributeValue.find({
+      attributeGroupId,
+      isActive: { $ne: false },
+    }).sort({ sortOrder: 1, name: 1 });
+
+    res.json({
+      success: true,
+      data: values,
+      message: 'Attribute values fetched successfully',
+    });
+  } catch (error) {
+    console.error('Error fetching attribute values:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch attribute values',
+      error: error.message,
+    });
+  }
+};
 export default {
   getAttributeGroups,
   getProductAttributeGroups,
@@ -491,4 +560,6 @@ export default {
   getNameAffectingAttributes,
   batchGenerateProductNames,
   generateNameRealTime,
+  removeAttributeGroupFromProduct,
+  getAttributeValuesByGroup
 };

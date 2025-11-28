@@ -4,6 +4,7 @@ import {
   addToCartSchema,
   updateCartItemSchema,
   syncCartSchema,
+  applyCouponSchema,
 } from '../validators/cart.validator.js';
 import { optionalAuthenticate } from '../middlewares/authenticate.js';
 import {
@@ -15,6 +16,7 @@ import {
   clearCart,
   syncCart,
   mergeCart,
+  applyCouponToCart,
 } from '../controllers/cart.controller.js';
 
 const router = express.Router();
@@ -98,7 +100,11 @@ router.post('/sync', validateRequest(syncCartSchema), syncCart);
 
 // Merge guest cart with user cart after login
 router.post('/merge', mergeCart);
-
+router.post(
+  '/apply-coupon',
+  validateRequest(applyCouponSchema),
+  applyCouponToCart
+);
 // Update cart item quantity
 router.put('/items/:id', validateRequest(updateCartItemSchema), updateCartItem);
 

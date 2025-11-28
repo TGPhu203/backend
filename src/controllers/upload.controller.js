@@ -11,10 +11,12 @@ const __dirname = path.dirname(__filename);
 
 // Create upload directories if they don't exist
 const uploadDirs = {
-  reviews: path.join(__dirname, '../../uploads/reviews'),
-  products: path.join(__dirname, '../../uploads/products'),
-  users: path.join(__dirname, '../../uploads/users'),
+  reviews: path.join(__dirname, "../../uploads/reviews"),
+  products: path.join(__dirname, "../../uploads/products"),
+  users: path.join(__dirname, "../../uploads/users"),
+  avatar: path.join(__dirname, "../../uploads/avatar"),   // 👈 THÊM DÒNG NÀY
 };
+
 
 Object.values(uploadDirs).forEach((dir) => {
   if (!fs.existsSync(dir)) {

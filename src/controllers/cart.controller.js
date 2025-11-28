@@ -1,8 +1,6 @@
-import { Cart, CartItem, Product, ProductVariant, WarrantyPackage } from '../models/index.js';
+import { Cart, CartItem, Product, ProductVariant, WarrantyPackage, Coupon, AttributeValue } from '../models/index.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { v4 as uuidv4 } from 'uuid';
-
-// ======================= GET CART =======================
 export const getCart = async (req, res, next) => {
   try {
     let cart;
@@ -14,16 +12,22 @@ export const getCart = async (req, res, next) => {
         { userId: req.user.id, isActive: true },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
-    }
-
-    // GUEST CART
-    else {
+    } else {
+      // GUEST CART
       const { sessionId } = req.cookies;
 
       if (!sessionId) {
         return res.status(200).json({
           status: "success",
-          data: { id: null, items: [], totalItems: 0, subtotal: 0 },
+          data: {
+            id: null,
+            items: [],
+            totalItems: 0,
+            subtotal: 0,
+            couponCode: null,
+            couponDiscount: 0,
+            total: 0,
+          },
         });
       }
 
@@ -34,7 +38,6 @@ export const getCart = async (req, res, next) => {
       );
     }
 
-    // 🔥 LẤY ĐẦY ĐỦ PRODUCT CHO UI
     const cartItems = await CartItem.find({ cartId: cart._id })
       .populate({
         path: "productId",
@@ -63,12 +66,20 @@ export const getCart = async (req, res, next) => {
           stockQuantity 
           attributes
         `,
+        populate: {
+          path: "attributes.attributeValueId",
+          model: "AttributeValue",
+          select: "name value colorCode imageUrl",
+        },
       })
       .lean();
 
-    // TÍNH TOÁN GIỎ HÀNG
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     const subtotal = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
+
+    const couponDiscount = cart.couponDiscount || 0;
+    const couponCode = cart.couponCode || null;
+    const total = Math.max(0, subtotal - couponDiscount); // số tiền thực tế sẽ đem đi thanh toán PayOS
 
     return res.status(200).json({
       status: "success",
@@ -77,12 +88,16 @@ export const getCart = async (req, res, next) => {
         items: cartItems,
         totalItems,
         subtotal,
+        couponCode,
+        couponDiscount,
+        total,
       },
     });
   } catch (err) {
     next(err);
   }
 };
+
 
 
 // ======================= ADD TO CART =======================
@@ -364,5 +379,127 @@ export const mergeCart = async (req, res, next) => {
     return getCart(req, res, next);
   } catch (error) {
     next(error);
+  }
+};
+export const applyCouponToCart = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { code } = req.body;
+
+    if (!code || !code.trim()) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "Vui lòng nhập mã khuyến mãi" });
+    }
+
+    const normalizedCode = code.trim().toUpperCase();
+
+    // 1) Tìm mã
+    const coupon = await Coupon.findOne({
+      code: normalizedCode,
+      isActive: true,
+    });
+
+    if (!coupon) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "Mã khuyến mãi không hợp lệ" });
+    }
+
+    const now = new Date();
+    if (coupon.startDate && coupon.startDate > now) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "Mã này chưa bắt đầu áp dụng" });
+    }
+    if (coupon.endDate && coupon.endDate < now) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "Mã khuyến mãi đã hết hạn" });
+    }
+
+    // 2) Lấy cart & cartItems của user
+    const cart = await Cart.findOne({ userId, isActive: true });
+    if (!cart) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "Giỏ hàng đang trống" });
+    }
+
+    const cartItems = await CartItem.find({ cartId: cart._id }).lean();
+    if (!cartItems.length) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "Giỏ hàng đang trống" });
+    }
+
+    const subtotal = cartItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+
+    if (subtotal < (coupon.minOrderAmount || 0)) {
+      return res.status(400).json({
+        status: "error",
+        message: `Đơn hàng cần tối thiểu ${coupon.minOrderAmount.toLocaleString(
+          "vi-VN"
+        )}₫ để dùng mã này`,
+      });
+    }
+
+    // 3) Tính số tiền giảm
+    let discountAmount = 0;
+    if (coupon.type === "percent") {
+      discountAmount = Math.round((subtotal * coupon.value) / 100);
+    } else {
+      discountAmount = coupon.value;
+    }
+
+    if (coupon.maxDiscount && coupon.type === "percent") {
+      discountAmount = Math.min(discountAmount, coupon.maxDiscount);
+    }
+
+    // 4) Lưu lên Cart – để sau khi thanh toán PayOS, Order lấy đúng số đã trừ
+    const updatedCart = await Cart.findOneAndUpdate(
+      { _id: cart._id },
+      {
+        couponCode: coupon.code,
+        couponDiscount: discountAmount,
+      },
+      { new: true }
+    ).lean();
+
+    const totalAfterDiscount = Math.max(
+      0,
+      subtotal - (updatedCart.couponDiscount || 0)
+    );
+
+    return res.status(200).json({
+      status: "success",
+      data: {
+        cart: {
+          id: updatedCart._id,
+          subtotal,
+          couponCode: updatedCart.couponCode,
+          couponDiscount: updatedCart.couponDiscount || 0,
+          total: totalAfterDiscount, // số tiền bạn gửi sang PayOS
+        },
+        code: coupon.code,
+        discountAmount,
+        description:
+          coupon.type === "percent"
+            ? `Giảm ${coupon.value}%${
+                coupon.maxDiscount
+                  ? ` tối đa ${coupon.maxDiscount.toLocaleString("vi-VN")}₫`
+                  : ""
+              }`
+            : `Giảm ${coupon.value.toLocaleString("vi-VN")}₫`,
+      },
+    });
+  } catch (err) {
+    console.error("applyCouponToCart error:", err);
+    return res
+      .status(500)
+      .json({ status: "error", message: "Lỗi server khi áp dụng mã" });
   }
 };

@@ -19,6 +19,7 @@ import { authenticate } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
 
 import {
+  validate,
   validateRequest,
   validateOrderAddress, // 🔥 Cái này dùng cho createOrder
 } from "../middlewares/validateRequest.js";
@@ -66,7 +67,7 @@ router.get("/admin/all", authorize("admin"), getAllOrders);
 router.patch(
   "/admin/:id/status",
   authorize("admin"),
-  validateRequest(updateOrderStatusSchema),
+  validate(updateOrderStatusSchema),
   updateOrderStatus
 );
 

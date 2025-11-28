@@ -3,31 +3,74 @@ import { validationResult } from "express-validator";
 import { AppError } from "./errorHandler.js";
 
 /**
- * 1) Validate bằng JOI schema (nếu schema được truyền vào)
+ * validateRequest:
+ * - Nếu truyền vào Joi schema (có hàm .validate)  -> validate bằng Joi
+ * - Nếu truyền vào mảng / function express-validator -> chạy rules + check validationResult
+ * - Nếu không truyền gì hợp lệ -> next()
  */
-export const validateRequest = (schema, type = "body") => {
-  return (req, res, next) => {
-    if (!schema) return next();
+export const validateRequest = (schemaOrRules, type = "body") => {
+  // ===== Trường hợp Joi schema =====
+  if (schemaOrRules && typeof schemaOrRules.validate === "function") {
+    return (req, res, next) => {
+      const data = type === "params" ? req.params : req.body;
 
-    const data = type === "params" ? req.params : req.body;
+      const { value, error } = schemaOrRules.validate(data, {
+        abortEarly: false,
+        stripUnknown: true,
+      });
 
-    const { error } = schema.validate(data, {
-      abortEarly: false,
-      stripUnknown: true,
-    });
+      if (error) {
+        const message = error.details.map((d) => d.message).join(", ");
+        return next(new AppError(message, 400));
+      }
 
-    if (error) {
-      const message = error.details.map((d) => d.message).join(", ");
-      return next(new AppError(message, 400));
-    }
+      // Gắn lại data đã stripUnknown
+      if (type === "params") {
+        req.params = value;
+      } else {
+        req.body = value;
+      }
 
-    next();
-  };
+      next();
+    };
+  }
+
+  // ===== Trường hợp express-validator rules =====
+  if (Array.isArray(schemaOrRules) || typeof schemaOrRules === "function") {
+    const rules = Array.isArray(schemaOrRules)
+      ? schemaOrRules
+      : [schemaOrRules];
+
+    // Trả về 1 mảng middleware: [...rules, check lỗi]
+    return [
+      ...rules,
+      (req, res, next) => {
+        const errors = validationResult(req);
+
+        if (!errors.isEmpty()) {
+          const formattedErrors = errors.array().map((error) => ({
+            field: error.path || error.param,
+            message: error.msg,
+            value: error.value,
+          }));
+
+          return res.status(400).json({
+            status: "fail",
+            message: "Validation error",
+            errors: formattedErrors,
+          });
+        }
+
+        next();
+      },
+    ];
+  }
+
+  // ===== Không có schema hoặc loại không hỗ trợ =====
+  return (req, res, next) => next();
 };
 
-/**
- * 2) Validate bằng express-validator rules
- */
+// Giữ nguyên nếu bạn đang dùng ở chỗ khác
 export const validateExpressValidator = (req, res, next) => {
   const errors = validationResult(req);
 
@@ -37,9 +80,6 @@ export const validateExpressValidator = (req, res, next) => {
       message: error.msg,
       value: error.value,
     }));
-
-    console.log("🔍 Validation Errors:", formattedErrors);
-    console.log("📝 Request Body:", req.body);
 
     return res.status(400).json({
       status: "fail",
@@ -51,14 +91,10 @@ export const validateExpressValidator = (req, res, next) => {
   next();
 };
 
-/**
- * 3) Validate địa chỉ cho createOrder (CHUẨN THEO BACKEND)
- */
 export const validateOrderAddress = (req, res, next) => {
   const { shippingAddress, billingAddress } = req.body;
   const errors = [];
 
-  // --- Validate shipping ---
   if (!shippingAddress) {
     errors.push("Thiếu thông tin giao hàng");
   } else {
@@ -71,7 +107,6 @@ export const validateOrderAddress = (req, res, next) => {
     if (!shippingAddress.phone) errors.push("Số điện thoại giao hàng là trường bắt buộc");
   }
 
-  // --- Validate billing ---
   if (!billingAddress) {
     errors.push("Thiếu thông tin thanh toán");
   } else {
@@ -91,9 +126,7 @@ export const validateOrderAddress = (req, res, next) => {
   next();
 };
 
-/**
- * 4) Dành cho express-validator
- */
+// Helper cho express-validator nếu bạn vẫn muốn dùng kiểu cũ
 export const validate = (rules) => {
   return [...rules, validateExpressValidator];
 };

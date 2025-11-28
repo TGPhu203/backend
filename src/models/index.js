@@ -19,7 +19,10 @@ import AttributeGroup from './attributeGroup.js';
 import AttributeValue from './attributeValue.js';
 import ProductAttributeGroup from './productAttributeGroup.js';
 import RepairRequest from './repairRequest.js';
+import Coupon from './coupon.js';
+
 import Image from './image.js';
+import { LoyaltyConfig } from './loyaltyConfig.js';
 
 /* ------------------- EXPORT ------------------- */
 export {
@@ -45,4 +48,6 @@ export {
   ProductAttributeGroup,
   Image,
   RepairRequest,
+  LoyaltyConfig,
+  Coupon,
 };

@@ -10,17 +10,151 @@ import {
   ProductWarranty,        // 👈 THÊM
 } from '../models/index.js';
 import { AppError } from '../middlewares/errorHandler.js';
+// Các populate chung cho list sản phẩm
+// Các populate chung cho list sản phẩm
+const PRODUCT_LIST_POPULATE = [
+  { path: "categories", select: "name slug" },
+  { path: "attributes" },
+  { path: "variants" },
+  { path: "reviews", select: "rating" },
+  {
+    path: "productSpecifications",
+    options: {
+      sort: { section: 1, displayOrder: 1, attributeName: 1 },
+    },
+  },
+];
 
-// =================== USER ROUTES ===================
+// Hàm map 1 product (lean) sang dữ liệu trả về cho FE (list)
+const mapProductForList = (product) => {
+  // ====== RATING ======
+  const ratings = { average: 0, count: 0 };
+  if (Array.isArray(product.reviews) && product.reviews.length > 0) {
+    const totalRating = product.reviews.reduce(
+      (sum, r) => sum + r.rating,
+      0
+    );
+    ratings.average = parseFloat(
+      (totalRating / product.reviews.length).toFixed(1)
+    );
+    ratings.count = product.reviews.length;
+  }
 
-// Get all products with pagination and filters
+  // ====== GIÁ GỐC (base / variant thấp nhất) ======
+  let displayPrice = product.price || 0;
+  let compareAtPrice = product.compareAtPrice ?? null;
+
+  if (Array.isArray(product.variants) && product.variants.length > 0) {
+    const sortedVariants = [...product.variants].sort(
+      (a, b) => (a.price || 0) - (b.price || 0)
+    );
+    displayPrice = sortedVariants[0].price || displayPrice;
+  }
+
+  // ====== CỘNG GIÁ THUỘC TÍNH MẶC ĐỊNH ======
+  let attributeAdjustment = 0;
+  if (Array.isArray(product.attributes) && product.attributes.length > 0) {
+    attributeAdjustment = product.attributes.reduce((sum, attr) => {
+      const options = Array.isArray(attr?.options) ? attr.options : [];
+      if (options.length === 0) return sum;
+
+      const defaultOpt =
+        options.find((opt) => opt.isDefault) || options[0];
+
+      const adj =
+        defaultOpt && typeof defaultOpt.priceAdjustment === "number"
+          ? defaultOpt.priceAdjustment
+          : 0;
+
+      return sum + adj;
+    }, 0);
+  }
+
+  const finalPrice = displayPrice + attributeAdjustment;
+  const finalCompareAtPrice =
+    typeof compareAtPrice === "number"
+      ? compareAtPrice + attributeAdjustment
+      : null;
+
+  // 👉 TÍNH % GIẢM GIÁ
+  let discountPercent = 0;
+  if (
+    typeof finalCompareAtPrice === "number" &&
+    finalCompareAtPrice > finalPrice
+  ) {
+    discountPercent = Math.round(
+      ((finalCompareAtPrice - finalPrice) / finalCompareAtPrice) * 100
+    );
+  }
+
+  // ====== TỒN KHO ======
+  let totalStock = 0;
+  if (typeof product.stockQuantity === "number") {
+    totalStock = product.stockQuantity;
+  }
+  if (Array.isArray(product.variants) && product.variants.length > 0) {
+    totalStock = product.variants.reduce(
+      (sum, v) => sum + (v.stockQuantity || 0),
+      0
+    );
+  }
+  const inStockComputed = totalStock > 0;
+
+  const specsArr = Array.isArray(product.productSpecifications)
+    ? product.productSpecifications
+    : [];
+  const specifications = specsArr.reduce((acc, spec) => {
+    if (spec.attributeName && spec.attributeValue != null) {
+      acc[spec.attributeName] = spec.attributeValue;
+    }
+    return acc;
+  }, {});
+
+  // ====== THU THẬP CÁC ATTRIBUTE VALUE ID TỪ VARIANTS ======
+  let attributeValueIds = [];
+  if (Array.isArray(product.variants) && product.variants.length > 0) {
+    const set = new Set();
+    for (const v of product.variants) {
+      if (Array.isArray(v.attributeValues)) {
+        v.attributeValues.forEach((val) => {
+          if (!val) return;
+          // nếu đã populate thì là object, nếu không thì là ObjectId/string
+          const id = typeof val === "object" ? val._id : val;
+          if (id) set.add(String(id));
+        });
+      }
+    }
+    attributeValueIds = Array.from(set);
+  }
+
+  const { reviews, productSpecifications, ...productData } = product;
+
+  return {
+    ...productData,
+    price: finalPrice,
+    compareAtPrice: finalCompareAtPrice,
+
+    finalPrice,
+    finalCompareAtPrice,
+    attributePriceAdjustment: attributeAdjustment,
+    discountPercent,
+
+    ratings,
+    stockQuantity: totalStock,
+    inStock: inStockComputed,
+    specifications,
+
+    // 👈 FE sẽ dùng field này để lọc
+    attributeValueIds,
+  };
+};
 export const getAllProducts = async (req, res, next) => {
   try {
     const {
       page = 1,
       limit = 10,
-      sort = 'createdAt',
-      order = 'DESC',
+      sort = "createdAt",
+      order = "DESC",
       category,
       search,
       minPrice,
@@ -28,34 +162,34 @@ export const getAllProducts = async (req, res, next) => {
       inStock,
       featured,
       status,
+      minDiscountPercent, // dùng cho deal
     } = req.query;
 
     const query = {};
-    const populateOptions = [];
 
-    // Build search query
+    // ====== SEARCH ======
     if (search) {
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { shortDescription: { $regex: search, $options: 'i' } },
-        { searchKeywords: { $in: [new RegExp(search, 'i')] } },
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { shortDescription: { $regex: search, $options: "i" } },
+        { searchKeywords: { $in: [new RegExp(search, "i")] } },
       ];
     }
 
-    // Price filters
+    // ====== PRICE FILTER (theo price gốc) ======
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = parseFloat(minPrice);
       if (maxPrice) query.price.$lte = parseFloat(maxPrice);
     }
 
-    // Other filters
-    if (inStock !== undefined) query.inStock = inStock === 'true';
-    if (featured !== undefined) query.featured = featured === 'true';
-    query.status = status || 'active';
+    // ====== FILTER KHÁC ======
+    if (inStock !== undefined) query.inStock = inStock === "true";
+    if (featured !== undefined) query.featured = featured === "true";
+    query.status = status || "active";
 
-    // Category filter
+    // ====== CATEGORY FILTER ======
     if (category) {
       const isValidUUID =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -64,7 +198,6 @@ export const getAllProducts = async (req, res, next) => {
       if (isValidUUID) {
         query.categories = category;
       } else {
-        // Find category by slug and filter products
         const categoryDoc = await Category.findOne({ slug: category });
         if (categoryDoc) {
           query.categories = categoryDoc._id;
@@ -72,64 +205,67 @@ export const getAllProducts = async (req, res, next) => {
       }
     }
 
-    // Populate options
-    populateOptions.push(
-      { path: 'categories', select: 'name slug' },
-      { path: 'attributes' },
-      { path: 'variants' },
-      { path: 'reviews', select: 'rating' }
-    );
+    const pageNumber = parseInt(page);
+    const limitNumber = parseInt(limit);
+    const skip = (pageNumber - 1) * limitNumber;
 
-    // Sort options
-    const sortOptions = {};
-    sortOptions[sort] = order === 'DESC' ? -1 : 1;
+    // Nếu sort theo discountPercent hoặc có minDiscountPercent
+    // → sort/filter ở JS rồi mới phân trang
+    const needJsSortOrFilter =
+      sort === "discountPercent" || minDiscountPercent !== undefined;
 
-    // Execute query
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const productsRaw = await Product.find(query)
-      .populate(populateOptions)
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
+    let mongoQuery = Product.find(query).populate(PRODUCT_LIST_POPULATE);
 
-    const total = await Product.countDocuments(query);
+    if (!needJsSortOrFilter) {
+      const sortOptions = {};
+      sortOptions[sort] = order === "DESC" ? -1 : 1;
+      mongoQuery = mongoQuery.sort(sortOptions).skip(skip).limit(limitNumber);
+    }
 
-    // Process products for display
-    const products = productsRaw.map((product) => {
-      const ratings = { average: 0, count: 0 };
-      if (product.reviews && product.reviews.length > 0) {
-        const totalRating = product.reviews.reduce(
-          (sum, r) => sum + r.rating,
-          0
-        );
-        ratings.average = parseFloat(
-          (totalRating / product.reviews.length).toFixed(1)
-        );
-        ratings.count = product.reviews.length;
+    const productsRaw = await mongoQuery.lean();
+    const totalBeforeFilter = await Product.countDocuments(query);
+
+    // MAP bằng hàm chung
+    let mapped = productsRaw.map(mapProductForList);
+
+    // SORT discountPercent trên JS
+    if (sort === "discountPercent") {
+      mapped.sort((a, b) => {
+        const da = a.discountPercent || 0;
+        const db = b.discountPercent || 0;
+        return order === "ASC" ? da - db : db - da;
+      });
+    }
+
+    // FILTER minDiscountPercent trên JS
+    if (minDiscountPercent !== undefined) {
+      const min = Number(minDiscountPercent);
+      if (!Number.isNaN(min)) {
+        mapped = mapped.filter((p) => (p.discountPercent || 0) >= min);
       }
+    }
 
-      let displayPrice = product.price || 0;
-      let compareAtPrice = product.compareAtPrice || null;
+    // total sau khi filter theo % giảm
+    const total =
+      minDiscountPercent !== undefined || sort === "discountPercent"
+        ? mapped.length
+        : totalBeforeFilter;
 
-      if (product.variants && product.variants.length > 0) {
-        const sortedVariants = product.variants.sort(
-          (a, b) => a.price - b.price
-        );
-        displayPrice = sortedVariants[0].price || displayPrice;
-      }
-
-      const { reviews, ...productData } = product;
-      return { ...productData, price: displayPrice, compareAtPrice, ratings };
-    });
+    // Nếu có sort/filter ở JS → phân trang ở đây
+    let pagedProducts = mapped;
+    if (needJsSortOrFilter) {
+      const start = (pageNumber - 1) * limitNumber;
+      const end = start + limitNumber;
+      pagedProducts = mapped.slice(start, end);
+    }
 
     res.status(200).json({
-      status: 'success',
+      status: "success",
       data: {
         total,
-        pages: Math.ceil(total / limit),
-        currentPage: parseInt(page),
-        products,
+        pages: Math.ceil(total / limitNumber),
+        currentPage: pageNumber,
+        products: pagedProducts,
       },
     });
   } catch (error) {
@@ -137,24 +273,31 @@ export const getAllProducts = async (req, res, next) => {
   }
 };
 
-// Get product by ID
+
 export const getProductById = async (req, res, next) => {
   try {
     const { id } = req.params;
+
     const product = await Product.findById(id)
       .populate('categories', 'name slug')
       .populate('attributes')
       .populate('variants')
-      .populate('productSpecifications')
+      .populate({
+        path: 'productSpecifications',      // chính là ProductAttribute
+        options: { sort: { section: 1, displayOrder: 1, attributeName: 1 } },
+      })
       .populate({
         path: 'reviews',
         populate: { path: 'user', select: 'id firstName lastName avatar' },
       });
-    // ⛔ BỎ populate('warrantyPackages'...) cũ vì đã tách bảng ProductWarranty
 
-    if (!product) throw new AppError('Không tìm thấy sản phẩm', 404);
+    if (!product) {
+      throw new AppError('Không tìm thấy sản phẩm', 404);
+    }
 
     const productJson = product.toJSON();
+
+    // Tính rating
     const ratings = { average: 0, count: 0 };
     if (productJson.reviews && productJson.reviews.length > 0) {
       const totalRating = productJson.reviews.reduce(
@@ -167,48 +310,55 @@ export const getProductById = async (req, res, next) => {
       ratings.count = productJson.reviews.length;
     }
 
-    // ==== LẤY OPTIONS BẢO HÀNH TỪ ProductWarranty ====
-    const productWarranties = await ProductWarranty.find({
-      productId: product._id,
-    })
-      .populate({
-        path: 'warrantyPackageId',
-        match: { isActive: true },
+    // Lấy bảo hành từ ProductWarranty
+    let warrantyOptions = [];
+    try {
+      const productWarranties = await ProductWarranty.find({
+        productId: product._id,
       })
-      .sort({
-        'warrantyPackageId.displayOrder': 1,
-        'warrantyPackageId.price': 1,
-      })
-      .lean();
+        .populate({
+          path: 'warrantyPackageId',
+          match: { isActive: true },
+        })
+        .sort({
+          'warrantyPackageId.displayOrder': 1,
+          'warrantyPackageId.price': 1,
+        })
+        .lean();
 
-    const warrantyOptions = productWarranties
-      .filter((pw) => pw.warrantyPackageId)
-      .map((pw) => {
-        const pkg = pw.warrantyPackageId;
-        const base = pkg.price || 0;
-        const finalPrice = pw.price && pw.price > 0 ? pw.price : base;
+      warrantyOptions = productWarranties
+        .filter((pw) => pw.warrantyPackageId)
+        .map((pw) => {
+          const pkg = pw.warrantyPackageId;
+          const base = pkg.price || 0;
+          const finalPrice = pw.price && pw.price > 0 ? pw.price : base;
 
-        return {
-          _id: pkg._id,
-          name: pkg.name,
-          description: pkg.description,
-          durationMonths: pkg.durationMonths,
-          basePrice: base,
-          price: finalPrice, // giá áp dụng cho product
-          isDefault: pw.isDefault,
-          productWarrantyId: pw._id,
-        };
-      });
+          return {
+            _id: pkg._id,
+            name: pkg.name,
+            description: pkg.description,
+            durationMonths: pkg.durationMonths,
+            basePrice: base,
+            price: finalPrice,
+            isDefault: pw.isDefault,
+            productWarrantyId: pw._id,
+          };
+        });
+    } catch (e) {
+      // Nếu phần bảo hành lỗi, vẫn trả về product, tránh 500
+      console.error('Lỗi load warrantyOptions:', e);
+    }
 
     res.status(200).json({
       status: 'success',
       data: {
         ...productJson,
         ratings,
-        warrantyOptions, // 👈 FE dùng field này để hiển thị bảo hành
+        warrantyOptions,
       },
     });
   } catch (error) {
+    console.error('getProductById error:', error);
     next(error);
   }
 };
@@ -301,9 +451,8 @@ export const getProductBySlug = async (req, res, next) => {
           currentVariant: {
             id: selectedVariant._id,
             name: selectedVariant.variantName,
-            fullName: `${productJson.baseName || productJson.name} - ${
-              selectedVariant.variantName
-            }`,
+            fullName: `${productJson.baseName || productJson.name} - ${selectedVariant.variantName
+              }`,
             price: selectedVariant.price,
             compareAtPrice: selectedVariant.compareAtPrice,
             sku: selectedVariant.sku,
@@ -326,9 +475,8 @@ export const getProductBySlug = async (req, res, next) => {
             isDefault: v.isDefault,
             sku: v.sku,
           })),
-          name: `${productJson.baseName || productJson.name} - ${
-            selectedVariant.variantName
-          }`,
+          name: `${productJson.baseName || productJson.name} - ${selectedVariant.variantName
+            }`,
           price: selectedVariant.price,
           compareAtPrice: selectedVariant.compareAtPrice,
           stockQuantity: selectedVariant.stockQuantity,
@@ -353,16 +501,6 @@ export const getProductBySlug = async (req, res, next) => {
 
 // =================== ADDITIONAL USER ROUTES ===================
 
-export const getFeaturedProducts = async (req, res, next) => {
-  try {
-    const products = await Product.find({ featured: true, status: 'active' }).limit(
-      20
-    );
-    res.status(200).json({ status: 'success', data: products });
-  } catch (error) {
-    next(error);
-  }
-};
 
 export const getNewArrivals = async (req, res, next) => {
   try {
@@ -398,10 +536,31 @@ export const getRelatedProducts = async (req, res, next) => {
   res.status(200).json({ status: 'success', data: [] });
 };
 
+export const getFeaturedProducts = async (req, res, next) => {
+  try {
+    const raw = await Product.find({
+      featured: true,
+      status: "active",
+    })
+      .populate(PRODUCT_LIST_POPULATE)
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    const products = raw.map(mapProductForList);
+
+    res.status(200).json({ status: "success", data: products });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getProductVariants = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const product = await Product.findById(id).populate('variants');
+    const product = await Product.findById(id)
+
+      .populate('variants');
     res
       .status(200)
       .json({ status: 'success', data: product?.variants || [] });
@@ -432,28 +591,73 @@ export const getProductReviewsSummary = async (req, res, next) => {
 
 export const createProduct = async (req, res, next) => {
   try {
-    const newProduct = new Product(req.body);
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      throw new AppError('Tên sản phẩm là bắt buộc', 400);
+    }
+
+    const normalizedName = name.trim();
+
+    // ✅ Kiểm tra trùng tên (có thể thêm điều kiện status nếu bạn có soft-delete)
+    const existing = await Product.findOne({
+      name: normalizedName,
+      // status: { $ne: 'deleted' }  // nếu bạn có trạng thái xoá mềm
+    });
+
+    if (existing) {
+      throw new AppError('Tên sản phẩm đã tồn tại', 400);
+    }
+
+    const newProduct = new Product({
+      ...req.body,
+      name: normalizedName,
+    });
+
     await newProduct.save();
     res.status(201).json({ status: 'success', data: newProduct });
   } catch (error) {
     next(error);
   }
 };
-
 export const updateProduct = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const product = await Product.findById(id);
-    if (!product) throw new AppError('Không tìm thấy sản phẩm', 404);
 
-    Object.assign(product, req.body);
+    const product = await Product.findById(id);
+    if (!product) throw new AppError("Không tìm thấy sản phẩm", 404);
+
+    console.log("🛠 updateProduct body:", req.body);
+
+    if (req.body.name && req.body.name.trim()) {
+      const newName = req.body.name.trim();
+
+      if (newName !== product.name) {
+        const existed = await Product.findOne({
+          _id: { $ne: id },
+          name: newName,
+        });
+
+        if (existed) {
+          throw new AppError("Tên sản phẩm đã tồn tại", 400);
+        }
+
+        product.name = newName;
+      }
+    }
+
+    Object.assign(product, { ...req.body, name: product.name });
+
     await product.save();
 
-    res.status(200).json({ status: 'success', data: product });
+    res.status(200).json({ status: "success", data: product });
   } catch (error) {
+    console.error("❌ updateProduct error:", error);
     next(error);
   }
 };
+
+
 
 export const deleteProduct = async (req, res, next) => {
   try {

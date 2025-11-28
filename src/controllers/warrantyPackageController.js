@@ -453,7 +453,7 @@ export const getWarrantyByImei = async (req, res) => {
     }
 
     const item = await OrderItem.findOne({ imei })
-      .populate("productId", "name slug thumbnail")
+      .populate("productId", "name slug thumbnail images")
       .populate("orderId", "orderNumber createdAt status")
       .populate("warrantyPackageId", "name durationMonths price")
       .lean();
@@ -468,9 +468,20 @@ export const getWarrantyByImei = async (req, res) => {
     const product = item.productId || null;
     const pkg = item.warrantyPackageId || null;
 
-    // fallback an toàn
-    const productName = item.name || product?.name || null;
-    const productImage = item.image || product?.thumbnail || null;
+    // Tên sản phẩm
+    const productName =
+      item.name || product?.name || null;
+
+    // Ảnh sản phẩm: ưu tiên ảnh snapshot trong OrderItem, sau đó thumbnail, sau đó images[0]
+    const productImage =
+      item.image ||
+      product?.thumbnail ||
+      (Array.isArray(product?.images) && product.images.length > 0
+        ? product.images[0]
+        : null);
+
+    // Debug nếu cần
+    // console.log("WarrantyByIMEI productImage =", productImage);
 
     res.status(200).json({
       status: "success",
@@ -486,7 +497,7 @@ export const getWarrantyByImei = async (req, res) => {
         order: item.orderId,
 
         // gói bảo hành
-        warrantyPackage: pkg,     
+        warrantyPackage: pkg,
         warrantyPackageName: pkg?.name ?? null,
         warrantyDurationMonths: pkg?.durationMonths ?? null,
         warrantyPackagePrice: pkg?.price ?? null,

@@ -1,3 +1,4 @@
+// models/productAttribute.model.js
 import mongoose from 'mongoose';
 
 const productAttributeSchema = new mongoose.Schema(
@@ -9,6 +10,7 @@ const productAttributeSchema = new mongoose.Schema(
       index: true,
     },
 
+    // Tên thuộc tính: "Thương hiệu", "Bảo hành", "CPU"...
     attributeName: {
       type: String,
       required: [true, 'Attribute name is required'],
@@ -16,10 +18,19 @@ const productAttributeSchema = new mongoose.Schema(
       index: true,
     },
 
+    // Giá trị: "Lenovo", "24 tháng", "Intel Core i5-13420H"...
     attributeValue: {
       type: String,
       required: [true, 'Attribute value is required'],
       trim: true,
+      index: true,
+    },
+
+    // Nhóm hiển thị
+    section: {
+      type: String,
+      enum: ['general', 'detail'], // bạn có thể mở rộng
+      default: 'general',
       index: true,
     },
 
@@ -33,26 +44,17 @@ const productAttributeSchema = new mongoose.Schema(
   }
 );
 
-/* ------------------ INDEXES TỐI ƯU ------------------ */
-
-// ⭐ Lấy thuộc tính theo sản phẩm
-productAttributeSchema.index({ productId: 1, displayOrder: 1 });
-
-// ⭐ Lọc sản phẩm theo tên thuộc tính
+productAttributeSchema.index({ productId: 1, section: 1, displayOrder: 1 });
 productAttributeSchema.index({ attributeName: 1, productId: 1 });
-
-// ⭐ Lọc nâng cao: Color = Red, Size = M...
 productAttributeSchema.index({ attributeName: 1, attributeValue: 1 });
-
-// ⭐ Ngăn giá trị trùng lặp cho 1 sản phẩm
 productAttributeSchema.index(
   { productId: 1, attributeName: 1, attributeValue: 1 },
   { unique: true }
 );
 
-// Sort theo thứ tự
-productAttributeSchema.index({ displayOrder: 1 });
-
-const ProductAttribute = mongoose.model('ProductAttribute', productAttributeSchema);
+const ProductAttribute = mongoose.model(
+  'ProductAttribute',
+  productAttributeSchema
+);
 
 export default ProductAttribute;

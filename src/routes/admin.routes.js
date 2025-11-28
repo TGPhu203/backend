@@ -10,7 +10,13 @@ import { authorize } from "../middlewares/authorize.js";
 import { validate, validateRequest } from '../middlewares/validateRequest.js';
 import { auditMiddleware } from '../services/adminAuditService.js';
 import { adminAuthenticate } from "../middlewares/adminAuth.js";
-
+import {
+  adminGetCoupons,
+  adminCreateCoupon,
+  adminUpdateCoupon,
+  adminDeleteCoupon,
+  applyCoupon,
+} from "../controllers/coupon.controller.js"; 
 // Validators
 import {
   createProductValidation,
@@ -28,7 +34,11 @@ import {
   getMonthlyRevenue,
   getYearlyRevenue,
 } from "../controllers/adminStatsController.js";
-
+import { updateOrderStatus as orderUpdateStatus } from "../controllers/order.controller.js";
+import {
+  createCouponSchema,
+  updateCouponSchema,
+} from "../validators/coupon.validator.js";  
 // 🔐 Tất cả route /admin đều phải:
 // 1) Đăng nhập (authenticate)
 // 2) Role admin (authorize)
@@ -47,7 +57,17 @@ router.get('/stats', validate(statsValidation), adminController.getDetailedStats
 router.get('/users', validate(paginationValidation), adminController.getAllUsers);
 router.put('/users/:id', validate(updateUserValidation), adminController.updateUser);
 router.delete('/users/:id', validate(deleteValidation), adminController.deleteUser);
+router.patch(
+  "/users/:id/block",
+  validateRequest(objectIdParam, "params"),
+  adminController.blockUser
+);
 
+router.patch(
+  "/users/:id/unblock",
+  validateRequest(objectIdParam, "params"),
+  adminController.unblockUser
+);
 /**
  * PRODUCT MANAGEMENT ROUTES
  */
@@ -92,7 +112,31 @@ router.delete('/reviews/:id', validate(deleteValidation), adminController.delete
  * ORDER MANAGEMENT ROUTES
  */
 router.get('/orders', validate(paginationValidation), adminController.getAllOrders);
-router.put('/orders/:id/status', validate(updateOrderStatusValidation), adminController.updateOrderStatus);
+router.patch(
+  "/orders/:id/status",
+  validate(updateOrderStatusValidation),
+  orderUpdateStatus
+);
+router.get("/coupons", adminGetCoupons);
+
+router.post(
+  "/coupons",
+  validateRequest(createCouponSchema),   // Joi schema
+  adminCreateCoupon
+);
+
+router.put(
+  "/coupons/:id",
+  validateRequest(updateCouponSchema),   // Joi schema
+  adminUpdateCoupon
+);
+
+router.delete("/coupons/:id", adminDeleteCoupon);
+router.post(
+  "/apply",
+  authenticate,         
+  applyCoupon
+);
 router.get(
   "/stats/revenue/daily",
   adminAuthenticate,

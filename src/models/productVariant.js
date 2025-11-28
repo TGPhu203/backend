@@ -1,6 +1,6 @@
+// src/models/productVariant.js
 import mongoose from 'mongoose';
 
-/* ------------------ SCHEMA ------------------ */
 const productVariantSchema = new mongoose.Schema(
   {
     productId: {
@@ -59,10 +59,21 @@ const productVariantSchema = new mongoose.Schema(
       default: {},
     },
 
-    attributes: {
-      type: mongoose.Schema.Types.Mixed,
-      default: {},
-    },
+    // 🟢 CHỈ GIỮ 1 FIELD attributes – mảng subdocument
+    attributes: [
+      {
+        attributeGroupId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'AttributeGroup',
+          required: true,
+        },
+        attributeValueId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'AttributeValue',
+          required: true,
+        },
+      },
+    ],
 
     weight: {
       type: Number,
@@ -106,7 +117,6 @@ productVariantSchema.virtual('fullName').get(function () {
 
 /* ------------------ PRE-SAVE ------------------ */
 productVariantSchema.pre('save', async function (next) {
-  // 1) Generate SKU if missing
   if (!this.sku) {
     const Product = mongoose.model('Product');
     const product = await Product.findById(this.productId).select('sku name');
@@ -117,7 +127,6 @@ productVariantSchema.pre('save', async function (next) {
     this.sku = `${base}-${random}`;
   }
 
-  // 2) Enforce single default variant
   if (this.isDefault) {
     await mongoose
       .model('ProductVariant')
@@ -130,14 +139,12 @@ productVariantSchema.pre('save', async function (next) {
   next();
 });
 
-/* ------------------ HELPERS ------------------ */
 function slugifyBase(text = '') {
   return text
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '')
-    .substring(0, 10); // limit length for clean SKU
+    .substring(0, 10);
 }
 
-/* ------------------ EXPORT ------------------ */
 const ProductVariant = mongoose.model('ProductVariant', productVariantSchema);
 export default ProductVariant;

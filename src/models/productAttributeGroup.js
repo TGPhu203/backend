@@ -1,3 +1,4 @@
+// models/productAttributeGroup.model.js
 import mongoose from 'mongoose';
 
 const productAttributeGroupSchema = new mongoose.Schema(
@@ -14,7 +15,15 @@ const productAttributeGroupSchema = new mongoose.Schema(
       required: [true, 'Attribute group ID is required'],
       index: true,
     },
-    displayOrder: {
+
+    // Nhóm này bắt buộc chọn khi mua (vd: màu sắc)
+    isRequired: {
+      type: Boolean,
+      default: false,
+    },
+
+    // Thứ tự hiển thị nhóm trong UI sản phẩm
+    sortOrder: {
       type: Number,
       default: 0,
     },
@@ -33,9 +42,12 @@ productAttributeGroupSchema.index(
 // Hỗ trợ query phổ biến: tìm theo attributeGroup
 productAttributeGroupSchema.index({ attributeGroupId: 1 });
 
-// Hỗ trợ sorting & UI hiển thị theo displayOrder
-productAttributeGroupSchema.index({ productId: 1, displayOrder: 1 });
+// Hỗ trợ sorting & UI hiển thị
+productAttributeGroupSchema.index({ productId: 1, sortOrder: 1 });
 
-const ProductAttributeGroup = mongoose.model('ProductAttributeGroup', productAttributeGroupSchema);
+const ProductAttributeGroup = mongoose.model(
+  'ProductAttributeGroup',
+  productAttributeGroupSchema
+);
 
 export default ProductAttributeGroup;
