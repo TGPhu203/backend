@@ -182,3 +182,32 @@ export const updateRepairRequestStatus = async (req, res) => {
     });
   }
 };
+// LỊCH SỬ YÊU CẦU SỬA CHỮA CỦA CHÍNH USER
+export const getMyRepairRequests = async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        status: "error",
+        message: "Vui lòng đăng nhập để xem lịch sử bảo hành",
+      });
+    }
+
+    const userId = req.user.id;
+
+    const rows = await RepairRequest.find({ userId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      status: "success",
+      data: rows,
+    });
+  } catch (error) {
+    console.error("Error getMyRepairRequests:", error);
+    return res.status(500).json({
+      status: "error",
+      message: "Server error",
+    });
+  }
+};
+

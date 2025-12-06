@@ -1,3 +1,4 @@
+// middlewares/adminAuth.js
 import jwt from 'jsonwebtoken';
 import { User } from '../models/index.js';
 import { AppError } from './errorHandler.js';
@@ -33,8 +34,8 @@ export const adminAuthenticate = async (req, res, next) => {
       return next(new AppError('Người dùng không tồn tại', 401));
     }
 
-    // Check role
-    if (!['admin', 'manager'].includes(user.role)) {
+    // ✅ Cho phép admin, manager, support truy cập
+    if (!['admin', 'manager', 'support'].includes(user.role)) {
       return next(
         new AppError('Bạn không có quyền truy cập admin panel', 403)
       );
@@ -58,6 +59,7 @@ export const adminAuthenticate = async (req, res, next) => {
   }
 };
 
+// Super admin vẫn chỉ là admin
 export const requireSuperAdmin = (req, res, next) => {
   if (!req.user) {
     return next(new AppError('Vui lòng đăng nhập để tiếp tục', 401));

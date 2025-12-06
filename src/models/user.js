@@ -44,7 +44,7 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ['customer', 'admin', 'manager'],
+      enum: ['customer', 'admin', 'manager', "support"],
       default: 'customer',
     },
 
@@ -87,7 +87,16 @@ const userSchema = new mongoose.Schema(
       type: Date,
       select: false,
     },
-
+    // Thêm vào userSchema trong User.js
+    baseSalary: {
+      type: Number,
+      default: 0, // Lương cơ bản hoặc lương theo giờ
+    },
+    salaryType: {
+      type: String,
+      enum: ['monthly', 'hourly'],
+      default: 'monthly',
+    },
     stripeCustomerId: String,
   },
   {

@@ -467,6 +467,69 @@ export const cancelOrder = async (req, res, next) => {
     next(error);
   }
 };
+// User xác nhận đã nhận được hàng
+export const confirmOrderReceived = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const order = await Order.findOne({ _id: id, userId }).populate(
+      "userId",
+      "email firstName lastName"
+    );
+    if (!order) throw new AppError("Không tìm thấy đơn hàng", 404);
+
+    if (order.status === "completed") {
+      throw new AppError("Đơn hàng đã được hoàn thành trước đó", 400);
+    }
+
+    if (!["shipped", "processing", "confirmed"].includes(order.status)) {
+      throw new AppError(
+        "Chỉ có thể xác nhận đã nhận hàng khi đơn đang giao/đang xử lý",
+        400
+      );
+    }
+
+    const oldStatus = order.status;
+    order.status = "completed";
+
+    // COD thì khi khách xác nhận nhận hàng xem như đã thanh toán
+    if (order.paymentMethod === "cod" && order.paymentStatus !== "paid") {
+      order.paymentStatus = "paid";
+    }
+
+    await order.save();
+
+    // Cộng điểm & tổng chi tiêu (giống logic updateOrderStatus admin)
+    const amount = order.totalAmount || 0;
+    const user = await User.findById(order.userId);
+    if (user) {
+      const earned = Math.floor(amount / 10000); // 1 điểm / 100k
+      user.loyaltyPoints = (user.loyaltyPoints || 0) + earned;
+      user.totalSpent = (user.totalSpent || 0) + amount;
+      user.updateLoyaltyTier();
+      await user.save();
+    }
+
+    // Gửi email báo cập nhật trạng thái
+    await sendOrderStatusUpdateEmail(order.userId.email, {
+      orderNumber: order.orderNumber,
+      oldStatus,
+      newStatus: "completed",
+      customerName: `${order.userId.firstName || ""} ${
+        order.userId.lastName || ""
+      }`.trim(),
+    });
+
+    res.status(200).json({
+      status: "success",
+      message: "Đã xác nhận bạn đã nhận hàng. Cảm ơn bạn!",
+      data: order,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // Get all orders (Admin)
 export const getAllOrders = async (req, res, next) => {

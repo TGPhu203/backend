@@ -1,55 +1,73 @@
 // routes/review.routes.js
-import express from 'express';
+import express from "express";
 const router = express.Router();
 
-import * as reviewController from '../controllers/review.controller.js';
-import { validateRequest } from '../middlewares/validateRequest.js';
-import { reviewSchema, reviewHelpfulSchema } from '../validators/review.validator.js';
-import { authenticate } from '../middlewares/authenticate.js';
-import { authorize } from '../middlewares/authorize.js';
+import * as reviewController from "../controllers/review.controller.js";
+import { validateRequest } from "../middlewares/validateRequest.js";
+import {
+  reviewSchema,
+  reviewHelpfulSchema,
+} from "../validators/review.validator.js";
+import { authenticate } from "../middlewares/authenticate.js";
+import { authorize } from "../middlewares/authorize.js";
 
-// Public routes
-router.get('/product/:productId', reviewController.getProductReviews);
+/**
+ * PUBLIC ROUTES
+ */
 
-// User routes (authenticated)
-router.use('/user', authenticate);
-router.get('/user', reviewController.getUserReviews);
+// Lấy danh sách review của 1 sản phẩm (public)
+router.get("/product/:productId", reviewController.getProductReviews);
 
-router.post(
-  '/',
-  authenticate,
-  validateRequest(reviewSchema),
-  reviewController.createReview
+/**
+ * AUTHENTICATED USER ROUTES
+ * Tất cả route bên dưới đều yêu cầu đăng nhập
+ */
+router.use(authenticate);
+
+// ✅ Alias cho FE: /api/reviews/purchased-products
+router.get(
+  "/purchased-products",
+  reviewController.getPurchasedProductsForReview
 );
 
-router.put(
-  '/:id',
-  authenticate,
-  validateRequest(reviewSchema),
-  reviewController.updateReview
+// Lấy tất cả review của chính user
+router.get("/user", reviewController.getUserReviews);
+
+// Lấy danh sách sản phẩm đã mua (đã giao) để user chọn đánh giá
+router.get(
+  "/user/purchased-products",
+  reviewController.getPurchasedProductsForReview
 );
 
-router.delete('/:id', authenticate, reviewController.deleteReview);
+// Tạo review mới
+router.post("/", validateRequest(reviewSchema), reviewController.createReview);
 
+// Cập nhật review
+router.put("/:id", validateRequest(reviewSchema), reviewController.updateReview);
+
+// Xóa review
+router.delete("/:id", reviewController.deleteReview);
+
+// Đánh dấu review hữu ích / không hữu ích
 router.put(
-  '/:id/helpful',
-  authenticate,
+  "/:id/helpful",
   validateRequest(reviewHelpfulSchema),
   reviewController.markReviewHelpful
 );
 
-// Admin routes
+/**
+ * ADMIN ROUTES
+ * Cần quyền admin
+ */
 router.get(
-  '/admin/all',
-  authenticate,
-  authorize('admin'),
+  "/admin/all",
+  authorize("admin","manager"),
   reviewController.getAllReviews
 );
 
 router.patch(
-  '/admin/:id/verify',
-  authenticate,
-  authorize('admin'),
+  "/admin/:id/verify",
+  authorize("admin","manager"),
   reviewController.verifyReview
 );
 

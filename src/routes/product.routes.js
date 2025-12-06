@@ -30,7 +30,7 @@ router.get("/:id", productController.getProductById);
 router.post(
   "/",
   authenticate,
-  authorize("admin"),
+  authorize("admin","manager"),
   validateRequest(productSchema, "body"),   // Joi schema
   productController.createProduct
 );
@@ -38,7 +38,7 @@ router.post(
 router.put(
   "/:id",
   authenticate,
-  authorize("admin"),
+  authorize("admin","manager"),
   validateRequest(productSchema, "body"),   // dùng chung schema cho update
   productController.updateProduct
 );
@@ -46,7 +46,7 @@ router.put(
 router.delete(
   "/:id",
   authenticate,
-  authorize("admin"),
+  authorize("admin","manager"),
   productController.deleteProduct
 );
 

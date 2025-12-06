@@ -230,24 +230,60 @@ export const removeCartItem = async (req, res, next) => {
     next(err);
   }
 };
-
 // ======================= CLEAR CART =======================
 export const clearCart = async (req, res, next) => {
   try {
     let cart;
 
+    // USER CART
     if (req.user) {
-      cart = await Cart.findOne({ userId: req.user.id, isActive: true });
+      cart = await Cart.findOneAndUpdate(
+        { userId: req.user.id, isActive: true },
+        {
+          userId: req.user.id,
+          isActive: true,
+          couponCode: null,
+          couponDiscount: 0,
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
     } else {
-      cart = await Cart.findOne({ sessionId: req.cookies.sessionId, isActive: true });
+      // GUEST CART
+      const { sessionId } = req.cookies;
+
+      if (!sessionId) {
+        // Không có cart -> trả về giống getCart khi rỗng
+        return res.status(200).json({
+          status: "success",
+          data: {
+            id: null,
+            items: [],
+            totalItems: 0,
+            subtotal: 0,
+            couponCode: null,
+            couponDiscount: 0,
+            total: 0,
+          },
+        });
+      }
+
+      cart = await Cart.findOneAndUpdate(
+        { sessionId, isActive: true },
+        {
+          sessionId,
+          isActive: true,
+          couponCode: null,
+          couponDiscount: 0,
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
     }
 
-    if (cart) await CartItem.deleteMany({ cartId: cart._id });
+    // Xóa toàn bộ CartItem thuộc cart này
+    await CartItem.deleteMany({ cartId: cart._id });
 
-    res.status(200).json({
-      status: "success",
-      data: { id: cart?._id || null, items: [], totalItems: 0, subtotal: 0 },
-    });
+    // Dùng lại getCart để compute subtotal, total, v.v...
+    return getCart(req, res, next);
   } catch (err) {
     next(err);
   }

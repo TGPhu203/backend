@@ -20,7 +20,9 @@ import AttributeValue from './attributeValue.js';
 import ProductAttributeGroup from './productAttributeGroup.js';
 import RepairRequest from './repairRequest.js';
 import Coupon from './coupon.js';
-
+import Attendance from './Attendance.js';
+import Payroll from './Payroll.js';
+import { AppError } from '../middlewares/errorHandler.js';
 import Image from './image.js';
 import { LoyaltyConfig } from './loyaltyConfig.js';
 
@@ -50,4 +52,7 @@ export {
   RepairRequest,
   LoyaltyConfig,
   Coupon,
+  Attendance,
+  Payroll,
+  AppError,
 };

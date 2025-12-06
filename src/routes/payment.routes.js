@@ -35,7 +35,7 @@ router.post("/confirm-payment", confirmPayment);
 router.post("/create-customer", createCustomer);
 router.get("/payment-methods", getPaymentMethods);
 router.post("/create-setup-intent", createSetupIntent);
-router.post("/refund", authorize("admin"), createRefund);
+router.post("/refund", authorize("admin","manager"), createRefund);
 
 // Tạo link PayOS
 router.post("/payos/create-link", createPayOSPaymentLink);

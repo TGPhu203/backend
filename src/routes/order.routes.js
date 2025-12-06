@@ -12,6 +12,7 @@ import {
   repayOrder,
   getAllOrders,
   updateOrderStatus,
+  confirmOrderReceived,
 } from "../controllers/order.controller.js";
 
 // Middlewares
@@ -52,7 +53,7 @@ router.get("/:id", getOrderById);
 
 // 🟢 Hủy đơn
 router.post("/:id/cancel", cancelOrder);
-
+router.put("/:id/received", authenticate, confirmOrderReceived);
 // 🟢 Thanh toán lại
 router.post("/:id/repay", repayOrder);
 
@@ -61,12 +62,17 @@ router.post("/:id/repay", repayOrder);
 // ================================
 
 // 🟣 Admin xem tất cả đơn
-router.get("/admin/all", authorize("admin"), getAllOrders);
+// 🟣 Admin / Manager / Support xem tất cả đơn
+router.get(
+  "/admin/all",
+  authorize("admin", "manager", "support"),
+  getAllOrders
+);
 
 // 🟣 Admin cập nhật trạng thái đơn
 router.patch(
   "/admin/:id/status",
-  authorize("admin"),
+  authorize("admin","manager"),
   validate(updateOrderStatusSchema),
   updateOrderStatus
 );
