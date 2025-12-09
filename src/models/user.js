@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: [true, 'Email is required'],
-      unique: true,
+      // unique: true, // BỎ để tránh trùng với userSchema.index({ email: 1 }, { unique: true })
       lowercase: true,
       trim: true,
       validate: {
@@ -44,7 +44,7 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ['customer', 'admin', 'manager', "support"],
+      enum: ['customer', 'admin', 'manager', 'support'],
       default: 'customer',
     },
 
@@ -62,41 +62,50 @@ const userSchema = new mongoose.Schema(
       type: String,
       select: false,
     },
+
+    verificationTokenExpires: {
+      type: Date,
+      select: false,
+    },
+
     totalSpent: {
       type: Number,
-      default: 0, // tổng tiền đã chi (đã hoàn tất)
+      default: 0,
     },
     loyaltyPoints: {
       type: Number,
-      default: 0, // điểm tích lũy
+      default: 0,
     },
     loyaltyTier: {
       type: String,
       enum: ['none', 'silver', 'gold', 'diamond'],
       default: 'none',
     },
+
     resetPasswordToken: {
       type: String,
       select: false,
-    },
-    isBlocked: {
-      type: Boolean,
-      default: false,
     },
     resetPasswordExpires: {
       type: Date,
       select: false,
     },
-    // Thêm vào userSchema trong User.js
+
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
+
     baseSalary: {
       type: Number,
-      default: 0, // Lương cơ bản hoặc lương theo giờ
+      default: 0,
     },
     salaryType: {
       type: String,
       enum: ['monthly', 'hourly'],
       default: 'monthly',
     },
+
     stripeCustomerId: String,
   },
   {
@@ -107,6 +116,7 @@ const userSchema = new mongoose.Schema(
       transform(doc, ret) {
         delete ret.password;
         delete ret.verificationToken;
+        delete ret.verificationTokenExpires;
         delete ret.resetPasswordToken;
         delete ret.resetPasswordExpires;
         delete ret.__v;
@@ -117,6 +127,8 @@ const userSchema = new mongoose.Schema(
     toObject: { virtuals: true },
   }
 );
+
+// ================= METHODS =================
 userSchema.methods.updateLoyaltyTier = function () {
   const spent = this.totalSpent || 0;
 
@@ -130,27 +142,20 @@ userSchema.methods.updateLoyaltyTier = function () {
     this.loyaltyTier = 'none';
   }
 };
-/* -------------------- INDEXES -------------------- */
-// Unique email index
+
+// ================= INDEXES =================
 userSchema.index({ email: 1 }, { unique: true });
-
-// Query user list (admin)
 userSchema.index({ role: 1, isActive: 1 });
-
-// Improve login / lookup by phone
 userSchema.index({ phone: 1 }, { sparse: true });
-
-// Sort newest users
 userSchema.index({ createdAt: -1 });
-
-// Text search for name + email
 userSchema.index({
   email: 'text',
   firstName: 'text',
   lastName: 'text',
 });
+userSchema.index({ verificationToken: 1 }); // thêm cho verify email
 
-/* -------------------- VIRTUALS -------------------- */
+// ================= VIRTUALS =================
 userSchema.virtual('fullName').get(function () {
   return `${this.firstName} ${this.lastName}`;
 });
@@ -179,12 +184,12 @@ userSchema.virtual('carts', {
   foreignField: 'userId',
 });
 
-/* -------------------- PASSWORD HASH -------------------- */
+// ================= PASSWORD HOOK =================
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
 
   try {
-    const salt = await bcrypt.genSalt(12); // stronger security
+    const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
     next();
   } catch (error) {
@@ -192,7 +197,6 @@ userSchema.pre('save', async function (next) {
   }
 });
 
-/* -------------------- PASSWORD COMPARE -------------------- */
 userSchema.methods.comparePassword = function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };

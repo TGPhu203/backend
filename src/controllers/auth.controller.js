@@ -10,19 +10,15 @@ function signToken(payload, secret, expiresIn) {
   if (!secret) throw new Error("Missing JWT secret");
   return jwt.sign(payload, secret, { expiresIn });
 }
-
-/* ================= REGISTER ================= */
 export const register = async (req, res, next) => {
   try {
     const { email, password, firstName, lastName, phone } = req.body;
-
-    if (!email || !password || !firstName || !lastName)
-      throw new AppError("Thiếu thông tin bắt buộc", 400);
 
     const exists = await User.findOne({ email });
     if (exists) throw new AppError("Email đã được sử dụng", 400);
 
     const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
 
     const user = new User({
       email,
@@ -31,13 +27,18 @@ export const register = async (req, res, next) => {
       lastName,
       phone,
       verificationToken,
+      verificationTokenExpires,
     });
 
     await user.save();
 
-    try {
-      await emailService.sendVerificationEmail(user.email, verificationToken);
-    } catch { }
+    console.log("===== REGISTER =====");
+    console.log("user._id =", user._id);
+    console.log("user.email =", user.email);
+    console.log("token lưu trong DB =", user.verificationToken);
+    console.log("expires =", user.verificationTokenExpires);
+
+    await emailService.sendVerificationEmail(user.email, verificationToken);
 
     res.status(201).json({
       status: "success",
@@ -49,6 +50,9 @@ export const register = async (req, res, next) => {
     next(err);
   }
 };
+
+
+/* ================= LOGIN ================= */
 export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -56,20 +60,28 @@ export const login = async (req, res, next) => {
     if (!email || !password)
       throw new AppError("Email và mật khẩu là bắt buộc", 400);
 
-    // lấy thêm password để so sánh, các field khác lấy bình thường
     const user = await User.findOne({ email }).select("+password");
     if (!user) throw new AppError("Email hoặc mật khẩu không đúng", 401);
     if (!user.isActive) throw new AppError("Tài khoản bị khóa", 401);
 
+    // KHÔNG CHO ĐĂNG NHẬP NẾU CHƯA XÁC THỰC EMAIL
+    if (!user.isEmailVerified) {
+      throw new AppError(
+        "Tài khoản chưa xác thực email. Vui lòng kiểm tra hộp thư hoặc yêu cầu gửi lại email xác thực.",
+        403
+      );
+    }
+
     const match = await user.comparePassword(password);
     if (!match) throw new AppError("Email hoặc mật khẩu không đúng", 401);
+
     if (user.isBlocked) {
       return res.status(403).json({
         status: "error",
         message: "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hỗ trợ.",
       });
     }
-    // cập nhật hạng thành viên theo totalSpent hiện tại
+
     user.updateLoyaltyTier();
     await user.save();
 
@@ -85,7 +97,6 @@ export const login = async (req, res, next) => {
       "7d"
     );
 
-    // cookie
     res.cookie("token", token, {
       httpOnly: true,
       secure: false,
@@ -102,7 +113,7 @@ export const login = async (req, res, next) => {
       maxAge: 7 * 24 * 3600 * 1000,
     });
 
-    const safe = user.toJSON(); // đã bỏ password trong schema
+    const safe = user.toJSON();
 
     res.status(200).json({
       status: "success",
@@ -130,7 +141,6 @@ export const login = async (req, res, next) => {
   }
 };
 
-
 /* ================= LOGOUT ================= */
 export const logout = async (req, res, next) => {
   try {
@@ -145,18 +155,41 @@ export const logout = async (req, res, next) => {
     next(err);
   }
 };
-
-/* ================= VERIFY EMAIL ================= */
+// VERIFY EMAIL (GET /verify-email/:token)
 export const verifyEmail = async (req, res, next) => {
   try {
     const { token } = req.params;
+    console.log("[VERIFY] token nhận từ FE =", token);
+
     if (!token) throw new AppError("Token không hợp lệ", 400);
 
-    const user = await User.findOne({ verificationToken: token });
-    if (!user) throw new AppError("Token không hợp lệ hoặc đã hết hạn", 400);
+    const user = await User.findOne({ verificationToken: token })
+      .select("+verificationToken +verificationTokenExpires");
+
+    console.log("[VERIFY] user tìm được =", user && user.email);
+    console.log("[VERIFY] token trong DB =", user && user.verificationToken);
+    console.log("[VERIFY] expires =", user && user.verificationTokenExpires);
+
+    if (!user) {
+      throw new AppError(
+        "Liên kết xác thực không hợp lệ hoặc đã được sử dụng. Vui lòng yêu cầu gửi lại email xác thực.",
+        400
+      );
+    }
+
+    if (
+      user.verificationTokenExpires &&
+      user.verificationTokenExpires <= new Date()
+    ) {
+      throw new AppError(
+        "Liên kết xác thực đã hết hạn. Vui lòng yêu cầu gửi lại email xác thực.",
+        400
+      );
+    }
 
     user.isEmailVerified = true;
     user.verificationToken = null;
+    user.verificationTokenExpires = null;
     await user.save();
 
     res.status(200).json({
@@ -168,17 +201,33 @@ export const verifyEmail = async (req, res, next) => {
   }
 };
 
-/* ================= VERIFY EMAIL (POST TOKEN) ================= */
+
+// VERIFY EMAIL (POST /verify-email với body.token)
 export const verifyEmailWithToken = async (req, res, next) => {
   try {
     const { token } = req.body;
     if (!token) throw new AppError("Token không hợp lệ", 400);
 
-    const user = await User.findOne({ verificationToken: token });
-    if (!user) throw new AppError("Token không hợp lệ", 400);
+    const user = await User.findOne({ verificationToken: token })
+      .select("+verificationToken +verificationTokenExpires");
+
+    if (!user) {
+      throw new AppError(
+        "Liên kết xác thực không hợp lệ hoặc đã được sử dụng. Vui lòng yêu cầu gửi lại email xác thực.",
+        400
+      );
+    }
+
+    if (user.verificationTokenExpires && user.verificationTokenExpires <= new Date()) {
+      throw new AppError(
+        "Liên kết xác thực đã hết hạn. Vui lòng yêu cầu gửi lại email xác thực.",
+        400
+      );
+    }
 
     user.isEmailVerified = true;
     user.verificationToken = null;
+    user.verificationTokenExpires = null;
     await user.save();
 
     res.status(200).json({
@@ -189,6 +238,7 @@ export const verifyEmailWithToken = async (req, res, next) => {
     next(err);
   }
 };
+
 
 /* ================= RESEND VERIFICATION EMAIL ================= */
 export const resendVerification = async (req, res, next) => {
@@ -203,12 +253,15 @@ export const resendVerification = async (req, res, next) => {
       throw new AppError("Email đã được xác thực trước đó", 400);
 
     const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
+
     user.verificationToken = verificationToken;
+    user.verificationTokenExpires = new Date(verificationTokenExpires);
     await user.save();
 
     try {
       await emailService.sendVerificationEmail(email, verificationToken);
-    } catch { }
+    } catch {}
 
     res.status(200).json({
       status: "success",
@@ -223,8 +276,7 @@ export const resendVerification = async (req, res, next) => {
 export const refreshToken = async (req, res, next) => {
   try {
     const refreshToken = req.cookies.refreshToken;
-    if (!refreshToken)
-      throw new AppError("Bạn cần đăng nhập lại", 401);
+    if (!refreshToken) throw new AppError("Bạn cần đăng nhập lại", 401);
 
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.id);
@@ -240,7 +292,6 @@ export const refreshToken = async (req, res, next) => {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-
       path: "/",
       maxAge: 24 * 3600 * 1000,
     });
@@ -264,7 +315,7 @@ export const forgotPassword = async (req, res, next) => {
     if (!user) throw new AppError("Không tìm thấy tài khoản", 404);
 
     const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetTokenExpires = Date.now() + 3600000;
+    const resetTokenExpires = Date.now() + 3600000; // 1h
 
     user.resetPasswordToken = resetToken;
     user.resetPasswordExpires = new Date(resetTokenExpires);
@@ -272,7 +323,7 @@ export const forgotPassword = async (req, res, next) => {
 
     try {
       await emailService.sendResetPasswordEmail(email, resetToken);
-    } catch { }
+    } catch {}
 
     res.status(200).json({
       status: "success",
