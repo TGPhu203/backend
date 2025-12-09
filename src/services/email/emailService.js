@@ -1,90 +1,135 @@
 // services/email/emailService.js
 import nodemailer from 'nodemailer';
 
+
 // Create transporter
 const createTransporter = () => {
-  if (process.env.NODE_ENV === 'development') {
+  const host = process.env.EMAIL_HOST || "smtp.gmail.com";
+  const port = Number(process.env.EMAIL_PORT) || 587;
+  const user = process.env.EMAIL_USERNAME;
+  const pass = process.env.EMAIL_PASSWORD;
+
+  if (!user || !pass) {
+    console.error("[MAIL] Thiếu EMAIL_USERNAME hoặc EMAIL_PASSWORD");
+  }
+
+  if (process.env.NODE_ENV === "development") {
     return nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.ethereal.email',
-      port: process.env.EMAIL_PORT || 587,
+      host,
+      port,
       secure: false,
-      auth: {
-        user: process.env.EMAIL_USERNAME,
-        pass: process.env.EMAIL_PASSWORD,
-      },
+      auth: { user, pass },
     });
   }
 
   return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: process.env.EMAIL_SECURE === 'true',
-    auth: {
-      user: process.env.EMAIL_USERNAME,
-      pass: process.env.EMAIL_PASSWORD,
-    },
+    host,
+    port,
+    secure: process.env.EMAIL_SECURE === "true",
+    auth: { user, pass },
   });
 };
 
-// Send email
+// Send email (hàm chung)
 export const sendEmail = async (options) => {
   const transporter = createTransporter();
 
+  const fromName = process.env.EMAIL_FROM_NAME || "shopmini";
+  const fromEmail =
+    process.env.EMAIL_FROM || process.env.EMAIL_USERNAME || "no-reply@example.com";
+
+  const subject = options.subject || "(no subject)";
+  const text =
+    options.text ||
+    "Email này không có nội dung text. Nếu bạn thấy thông báo này thì có gì đó sai với template HTML.";
+  const html = options.html || `<p>${text}</p>`;
+
   const mailOptions = {
-    from: `${process.env.EMAIL_FROM_NAME} <${process.env.EMAIL_FROM}>`,
+    from: `${fromName} <${fromEmail}>`,
     to: options.email,
-    subject: options.subject,
-    html: options.html,
+    subject,
+    text,
+    html,
   };
+
+  // log debug
+  console.log("[MAIL] To:", options.email);
+  console.log("[MAIL] Subject:", subject);
+  console.log("[MAIL] HTML length:", html.length);
 
   await transporter.sendMail(mailOptions);
 };
 
-// Send verification email
+// ============== Verification email ==============
 export const sendVerificationEmail = async (email, token) => {
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
+  const verificationUrl = `${frontendUrl}/verify-email/${token}`;
 
-  await sendEmail({
-    email,
-    subject: 'Xác thực tài khoản của bạn',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Xác thực tài khoản</h2>
-        <p>Cảm ơn bạn đã đăng ký tài khoản. Vui lòng nhấp vào liên kết bên dưới để xác thực email của bạn:</p>
-        <p>
-          <a href="${verificationUrl}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 4px;">
-            Xác thực email
-          </a>
-        </p>
-        <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
-        <p>Liên kết này sẽ hết hạn sau 24 giờ.</p>
-      </div>
-    `,
-  });
+  const subject = "Xác thực tài khoản của bạn";
+
+  const text = [
+    "Cảm ơn bạn đã đăng ký tài khoản.",
+    "Vui lòng truy cập đường dẫn sau để xác thực email:",
+    verificationUrl,
+    "",
+    "Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.",
+    "Liên kết này sẽ hết hạn sau 24 giờ.",
+  ].join("\n");
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2>Xác thực tài khoản</h2>
+      <p>Cảm ơn bạn đã đăng ký tài khoản. Vui lòng nhấp vào liên kết bên dưới để xác thực email của bạn:</p>
+      <p>
+        <a href="${verificationUrl}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 4px;">
+          Xác thực email
+        </a>
+      </p>
+      <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
+      <p>Liên kết này sẽ hết hạn sau 24 giờ.</p>
+      <p>Nếu nút không hoạt động, hãy copy liên kết sau và dán vào trình duyệt:</p>
+      <p><a href="${verificationUrl}">${verificationUrl}</a></p>
+    </div>
+  `;
+
+  await sendEmail({ email, subject, text, html });
 };
 
-// Send reset password email
+// ============== Reset password email ==============
 export const sendResetPasswordEmail = async (email, token) => {
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
+  const resetUrl = `${frontendUrl}/reset-password/${token}`;
 
-  await sendEmail({
-    email,
-    subject: 'Đặt lại mật khẩu của bạn',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Đặt lại mật khẩu</h2>
-        <p>Bạn đã yêu cầu đặt lại mật khẩu. Vui lòng nhấp vào liên kết bên dưới để đặt lại mật khẩu của bạn:</p>
-        <p>
-          <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 4px;">
-            Đặt lại mật khẩu
-          </a>
-        </p>
-        <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
-        <p>Liên kết này sẽ hết hạn sau 1 giờ.</p>
-      </div>
-    `,
-  });
+  const subject = "Đặt lại mật khẩu của bạn";
+
+  const text = [
+    "Bạn đã yêu cầu đặt lại mật khẩu.",
+    "Vui lòng truy cập đường dẫn sau để đặt lại mật khẩu:",
+    resetUrl,
+    "",
+    "Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.",
+    "Liên kết này sẽ hết hạn sau 1 giờ.",
+  ].join("\n");
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2>Đặt lại mật khẩu</h2>
+      <p>Bạn đã yêu cầu đặt lại mật khẩu. Vui lòng nhấp vào liên kết bên dưới để đặt lại mật khẩu của bạn:</p>
+      <p>
+        <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 4px;">
+          Đặt lại mật khẩu
+        </a>
+      </p>
+      <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
+      <p>Liên kết này sẽ hết hạn sau 1 giờ.</p>
+      <p>Nếu nút không hoạt động, hãy copy liên kết sau và dán vào trình duyệt:</p>
+      <p><a href="${resetUrl}">${resetUrl}</a></p>
+    </div>
+  `;
+
+  await sendEmail({ email, subject, text, html });
 };
+
 
 // Send order confirmation email
 export const sendOrderConfirmationEmail = async (email, order) => {
